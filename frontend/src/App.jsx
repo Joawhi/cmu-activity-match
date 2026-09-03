@@ -1,122 +1,127 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './App.css';
+
+const API_URL = 'http://localhost:3001/api';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activities, setActivities] = useState([]);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    datetime: '',
+    location: '',
+    max_people: '',
+    category: '',
+    gender_restriction: 'none',
+  });
+
+  // Load activities from the backend when the page opens
+  useEffect(() => {
+    fetchActivities();
+  }, []);
+
+  const fetchActivities = async () => {
+    const res = await fetch(`${API_URL}/activities`);
+    const data = await res.json();
+    setActivities(data);
+  };
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!form.title) {
+      alert('Title is required');
+      return;
+    }
+
+    await fetch(`${API_URL}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+
+    // Reset the form and refresh the list
+    setForm({
+      title: '',
+      description: '',
+      datetime: '',
+      location: '',
+      max_people: '',
+      category: '',
+      gender_restriction: 'none',
+    });
+    fetchActivities();
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
+      <h1>CMU Activity Match</h1>
 
-      <div className="ticks"></div>
+      <h2>Create an activity</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <input
+          name="title"
+          placeholder="Title"
+          value={form.title}
+          onChange={handleChange}
+        />
+        <textarea
+          name="description"
+          placeholder="Description"
+          value={form.description}
+          onChange={handleChange}
+        />
+        <input
+          name="datetime"
+          type="datetime-local"
+          value={form.datetime}
+          onChange={handleChange}
+        />
+        <input
+          name="location"
+          placeholder="Location"
+          value={form.location}
+          onChange={handleChange}
+        />
+        <input
+          name="max_people"
+          type="number"
+          placeholder="Max number of people"
+          value={form.max_people}
+          onChange={handleChange}
+        />
+        <input
+          name="category"
+          placeholder="Category (e.g. Food, Museum, Games)"
+          value={form.category}
+          onChange={handleChange}
+        />
+        <select name="gender_restriction" value={form.gender_restriction} onChange={handleChange}>
+          <option value="none">No restriction</option>
+          <option value="male">Male only</option>
+          <option value="female">Female only</option>
+        </select>
+        <button type="submit">Create activity</button>
+      </form>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <h2>Activities</h2>
+      {activities.length === 0 && <p>No activities yet.</p>}
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {activities.map((activity) => (
+          <li key={activity.id} style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
+            <strong>{activity.title}</strong>
+            <p>{activity.description}</p>
+            <p>📍 {activity.location} — 🗓️ {activity.datetime}</p>
+            <p>Category: {activity.category} | Max people: {activity.max_people}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
-export default App
+export default App;
