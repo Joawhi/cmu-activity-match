@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { API_URL } from '../api';
+import { CATEGORIES } from '../constants';
 
 const emptyForm = {
   title: '',
@@ -100,7 +101,12 @@ function CreateActivityForm() {
         <div className="two-col">
           <div className="form-row">
             <label htmlFor="category">Category <span className="optional-label">(optional)</span></label>
-            <input id="category" name="category" value={form.category} onChange={handleChange} placeholder="Food, Museum, Games..." />
+            <select id="category" name="category" value={form.category} onChange={handleChange}>
+              <option value="">Select a category</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
           <div className="form-row">
             <label htmlFor="gender_restriction">Who can join <span className="optional-label">(optional)</span></label>
