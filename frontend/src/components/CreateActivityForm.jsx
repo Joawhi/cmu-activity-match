@@ -12,7 +12,7 @@ const emptyForm = {
   gender_restriction: 'none',
 };
 
-function CreateActivityForm() {
+function CreateActivityForm({ user }) {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [justCreated, setJustCreated] = useState(false);
@@ -54,7 +54,7 @@ function CreateActivityForm() {
     await fetch(`${API_URL}/activities`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, user_id: user.id }),
     });
 
     setForm(emptyForm);

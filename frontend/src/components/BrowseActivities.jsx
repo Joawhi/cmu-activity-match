@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { API_URL } from '../api';
 import { CATEGORIES } from '../constants';
 
-function BrowseActivities({ onCreateClick }) {
+function BrowseActivities({ onCreateClick, currentUserId }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -42,7 +42,9 @@ function BrowseActivities({ onCreateClick }) {
         dateFilter === '' ||
         (activity.datetime && activity.datetime.startsWith(dateFilter));
 
-      return matchesSearch && matchesCategory && matchesGender && matchesDate;
+      const isNotMine = activity.user_id !== currentUserId;
+
+      return matchesSearch && matchesCategory && matchesGender && matchesDate && isNotMine;
     });
   }, [activities, searchText, categoryFilter, genderFilter, dateFilter]);
 
@@ -124,6 +126,7 @@ function BrowseActivities({ onCreateClick }) {
               {activity.category && `${activity.category}`}
               {activity.max_people && ` · up to ${activity.max_people} people`}
             </p>
+            <p className="meta">Created by {activity.creator_name || 'Someone'}</p>
           </li>
         ))}
       </ul>
