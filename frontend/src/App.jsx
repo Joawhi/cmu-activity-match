@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import CreateActivityForm from './components/CreateActivityForm';
 import BrowseActivities from './components/BrowseActivities';
-import Login from './components/Login';
 import MyActivities from './components/MyActivities';
+import Login from './components/Login';
+import Modal from './components/Modal';
+import Profile from './components/Profile';
 
 const STORAGE_KEY = 'cmu_activity_match_user';
 
@@ -11,6 +13,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('create');
   const [user, setUser] = useState(null);
   const [checkedStorage, setCheckedStorage] = useState(false);
+  const [viewingProfileUserId, setViewingProfileUserId] = useState(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -43,7 +46,9 @@ function App() {
         </div>
         {user && (
           <div className="user-badge">
-            <span>{user.name}</span>
+            <button type="button" className="link-btn" onClick={() => setViewingProfileUserId(user.id)}>
+              {user.name}
+            </button>
             <button type="button" className="ghost-btn" onClick={handleLogout}>Log out</button>
           </div>
         )}
@@ -54,35 +59,33 @@ function App() {
       {user && (
         <>
           <nav className="nav">
-            <button
-              type="button"
-              className={activeTab === 'create' ? 'nav-tab active' : 'nav-tab'}
-              onClick={() => setActiveTab('create')}
-            >
+            <button type="button" className={activeTab === 'create' ? 'nav-tab active' : 'nav-tab'} onClick={() => setActiveTab('create')}>
               Create
             </button>
-            <button
-              type="button"
-              className={activeTab === 'browse' ? 'nav-tab active' : 'nav-tab'}
-              onClick={() => setActiveTab('browse')}
-            >
+            <button type="button" className={activeTab === 'browse' ? 'nav-tab active' : 'nav-tab'} onClick={() => setActiveTab('browse')}>
               Browse
             </button>
-            <button
-              type="button"
-              className={activeTab === 'mine' ? 'nav-tab active' : 'nav-tab'}
-              onClick={() => setActiveTab('mine')}
-            >
+            <button type="button" className={activeTab === 'mine' ? 'nav-tab active' : 'nav-tab'} onClick={() => setActiveTab('mine')}>
               Mine
             </button>
           </nav>
 
           {activeTab === 'create' && <CreateActivityForm user={user} />}
           {activeTab === 'browse' && (
-            <BrowseActivities onCreateClick={() => setActiveTab('create')} currentUserId={user.id} />
+            <BrowseActivities
+              onCreateClick={() => setActiveTab('create')}
+              currentUserId={user.id}
+              onViewProfile={(id) => setViewingProfileUserId(id)}
+            />
           )}
           {activeTab === 'mine' && <MyActivities user={user} />}
         </>
+      )}
+
+      {viewingProfileUserId && (
+        <Modal onClose={() => setViewingProfileUserId(null)}>
+          <Profile userId={viewingProfileUserId} currentUser={user} />
+        </Modal>
       )}
     </div>
   );

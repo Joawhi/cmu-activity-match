@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { API_URL } from '../api';
 import { CATEGORIES } from '../constants';
 
-function BrowseActivities({ onCreateClick, currentUserId }) {
+function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -126,7 +126,12 @@ function BrowseActivities({ onCreateClick, currentUserId }) {
               {activity.category && `${activity.category}`}
               {activity.max_people && ` · up to ${activity.max_people} people`}
             </p>
-            <p className="meta">Created by {activity.creator_name || 'Someone'}</p>
+            <p className="meta">
+              Created by{' '}
+              <button type="button" className="link-btn" onClick={() => onViewProfile(activity.user_id)}>
+                {activity.creator_display_name || activity.creator_name || 'Someone'}
+              </button>
+            </p>
           </li>
         ))}
       </ul>
