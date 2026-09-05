@@ -8,6 +8,9 @@ function MyActivities({ user }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [editErrors, setEditErrors] = useState({});
+  const [viewingApplicationsId, setViewingApplicationsId] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
 
   useEffect(() => {
     fetchMyActivities();
@@ -85,6 +88,33 @@ function MyActivities({ user }) {
     fetchMyActivities();
   };
 
+  const toggleApplications = async (activityId) => {
+    if (viewingApplicationsId === activityId) {
+      setViewingApplicationsId(null);
+      return;
+    }
+
+    setViewingApplicationsId(activityId);
+    setLoadingApplications(true);
+    const res = await fetch(`${API_URL}/activities/${activityId}/applications?user_id=${user.id}`);
+    const data = await res.json();
+    setApplications(data);
+    setLoadingApplications(false);
+  };
+
+  const respondToApplication = async (applicationId, status) => {
+    await fetch(`${API_URL}/applications/${applicationId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, creator_id: user.id }),
+    });
+
+    const res = await fetch(`${API_URL}/activities/${viewingApplicationsId}/applications?user_id=${user.id}`);
+    const data = await res.json();
+    setApplications(data);
+    fetchMyActivities();
+  };
+
   return (
     <div>
       <h2>My Activities</h2>
@@ -120,10 +150,40 @@ function MyActivities({ user }) {
                   {activity.category && `${activity.category}`}
                   {activity.max_people && ` · up to ${activity.max_people} people`}
                 </p>
+
                 <div className="edit-actions">
                   <button type="button" className="ghost-btn" onClick={() => startEditing(activity)}>Edit</button>
                   <button type="button" className="ghost-btn danger" onClick={() => deleteActivity(activity.id)}>Delete</button>
+                  {activity.application_count > 0 && (
+                    <button type="button" className="ghost-btn" onClick={() => toggleApplications(activity.id)}>
+                      {viewingApplicationsId === activity.id ? 'Hide requests' : `View requests (${activity.application_count})`}
+                    </button>
+                  )}
                 </div>
+
+                {viewingApplicationsId === activity.id && (
+                  <div className="applications-panel">
+                    {loadingApplications && <p className="muted-text">Loading requests...</p>}
+                    {!loadingApplications && applications.map((app) => (
+                      <div key={app.id} className="application-row">
+                        <div>
+                          <strong>{app.applicant_display_name || app.applicant_name}</strong>
+                          {app.note && <p className="meta">"{app.note}"</p>}
+                        </div>
+                        {app.status === 'pending' ? (
+                          <div className="edit-actions">
+                            <button type="button" className="submit-btn" onClick={() => respondToApplication(app.id, 'accepted')}>Accept</button>
+                            <button type="button" className="ghost-btn danger" onClick={() => respondToApplication(app.id, 'declined')}>Decline</button>
+                          </div>
+                        ) : (
+                          <span className="application-status">
+                            {app.status === 'accepted' ? '✓ Accepted' : 'Declined'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </li>

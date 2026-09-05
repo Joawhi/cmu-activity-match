@@ -9,6 +9,9 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+  const [applyingId, setApplyingId] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const [applyError, setApplyError] = useState('');
 
   useEffect(() => {
     fetchActivities();
@@ -16,13 +19,11 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
 
   const fetchActivities = async () => {
     setLoading(true);
-    const res = await fetch(`${API_URL}/activities`);
+    const res = await fetch(`${API_URL}/activities?viewer_id=${currentUserId}`);
     const data = await res.json();
     setActivities(data);
     setLoading(false);
   };
-
-  // Build the list of categories that actually exist, for the dropdown
 
   const filteredActivities = useMemo(() => {
     return activities.filter((activity) => {
@@ -32,21 +33,14 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
         (activity.description || '').toLowerCase().includes(searchText.toLowerCase()) ||
         (activity.location || '').toLowerCase().includes(searchText.toLowerCase());
 
-      const matchesCategory =
-        categoryFilter === 'all' || activity.category === categoryFilter;
-
-      const matchesGender =
-        genderFilter === 'all' || activity.gender_restriction === genderFilter;
-
-      const matchesDate =
-        dateFilter === '' ||
-        (activity.datetime && activity.datetime.startsWith(dateFilter));
-
+      const matchesCategory = categoryFilter === 'all' || activity.category === categoryFilter;
+      const matchesGender = genderFilter === 'all' || activity.gender_restriction === genderFilter;
+      const matchesDate = dateFilter === '' || (activity.datetime && activity.datetime.startsWith(dateFilter));
       const isNotMine = activity.user_id !== currentUserId;
 
       return matchesSearch && matchesCategory && matchesGender && matchesDate && isNotMine;
     });
-  }, [activities, searchText, categoryFilter, genderFilter, dateFilter]);
+  }, [activities, searchText, categoryFilter, genderFilter, dateFilter, currentUserId]);
 
   const clearFilters = () => {
     setSearchText('');
@@ -58,13 +52,41 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
   const filtersActive =
     searchText !== '' || categoryFilter !== 'all' || genderFilter !== 'all' || dateFilter !== '';
 
+  const startApplying = (activityId) => {
+    setApplyingId(activityId);
+    setNoteText('');
+    setApplyError('');
+  };
+
+  const cancelApplying = () => {
+    setApplyingId(null);
+    setNoteText('');
+    setApplyError('');
+  };
+
+  const submitApplication = async (activityId) => {
+    const res = await fetch(`${API_URL}/activities/${activityId}/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: currentUserId, note: noteText }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setApplyError(data.error || 'Something went wrong.');
+      return;
+    }
+
+    setApplyingId(null);
+    setNoteText('');
+    fetchActivities();
+  };
+
   return (
     <div>
       <div className="browse-header">
         <h2>Activities</h2>
-        <button type="button" className="ghost-btn" onClick={onCreateClick}>
-          + New
-        </button>
+        <button type="button" className="ghost-btn" onClick={onCreateClick}>+ New</button>
       </div>
 
       <div className="filter-bar">
@@ -74,31 +96,21 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
           <option value="all">All categories</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-
         <select value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)}>
           <option value="all">Anyone can join</option>
           <option value="none">Everyone (no restriction)</option>
           <option value="male">Male only</option>
           <option value="female">Female only</option>
         </select>
-
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-        />
-
+        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
         {filtersActive && (
-          <button type="button" className="ghost-btn" onClick={clearFilters}>
-            Clear filters
-          </button>
+          <button type="button" className="ghost-btn" onClick={clearFilters}>Clear filters</button>
         )}
       </div>
 
@@ -107,9 +119,7 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
       {!loading && filteredActivities.length === 0 && (
         <div className="empty-state">
           <p>{activities.length === 0 ? 'No activities yet.' : 'No activities match your filters.'}</p>
-          <button type="button" className="submit-btn" onClick={onCreateClick}>
-            + Create a plan
-          </button>
+          <button type="button" className="submit-btn" onClick={onCreateClick}>+ Create a plan</button>
         </div>
       )}
 
@@ -132,6 +142,40 @@ function BrowseActivities({ onCreateClick, currentUserId, onViewProfile }) {
                 {activity.creator_display_name || activity.creator_name || 'Someone'}
               </button>
             </p>
+
+            {activity.my_application_status ? (
+              <p className="application-status">
+                {activity.my_application_status === 'pending' && "✓ Request sent — waiting for a response"}
+                {activity.my_application_status === 'accepted' && "✓ You're in!"}
+                {activity.my_application_status === 'declined' && 'Request declined'}
+              </p>
+            ) : applyingId === activity.id ? (
+              <div className="inline-edit">
+                <div className="form-row">
+                  <label htmlFor={`note-${activity.id}`}>Short note <span className="optional-label">(optional)</span></label>
+                  <textarea
+                    id={`note-${activity.id}`}
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    rows={2}
+                    placeholder="Say hi, or why you'd like to join..."
+                  />
+                </div>
+                {applyError && <span className="field-error">{applyError}</span>}
+                <div className="edit-actions">
+                  <button type="button" className="submit-btn" onClick={() => submitApplication(activity.id)}>
+                    Send request
+                  </button>
+                  <button type="button" className="ghost-btn" onClick={cancelApplying}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="edit-actions">
+                <button type="button" className="submit-btn" onClick={() => startApplying(activity.id)}>
+                  Request to join
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

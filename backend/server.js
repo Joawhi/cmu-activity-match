@@ -263,6 +263,68 @@ app.post('/api/activities/:id/apply', async (req, res) => {
   }
 });
 
+// Get all applications for one activity (only the creator can view this)
+app.get('/api/activities/:id/applications', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = Number(req.query.user_id);
+
+    const activityResult = await pool.query('SELECT * FROM activities WHERE id = $1', [id]);
+    if (activityResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+    if (activityResult.rows[0].user_id !== userId) {
+      return res.status(403).json({ error: 'Only the creator can view applications' });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT applications.*, users.name AS applicant_name, users.display_name AS applicant_display_name
+      FROM applications
+      JOIN users ON applications.user_id = users.id
+      WHERE applications.activity_id = $1
+      ORDER BY applications.created_at ASC
+      `,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Accept or decline an application (only the activity's creator can do this)
+app.put('/api/applications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, creator_id } = req.body;
+
+    if (!['accepted', 'declined'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be accepted or declined' });
+    }
+
+    const appResult = await pool.query(
+      `SELECT applications.*, activities.user_id AS activity_owner_id
+       FROM applications
+       JOIN activities ON applications.activity_id = activities.id
+       WHERE applications.id = $1`,
+      [id]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+    if (appResult.rows[0].activity_owner_id !== creator_id) {
+      return res.status(403).json({ error: 'Only the activity creator can manage this application' });
+    }
+
+    await pool.query('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
