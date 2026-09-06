@@ -15,3 +15,16 @@ export const LANGUAGES = [
   'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
   'Portuguese', 'Korean', 'Japanese', 'German', 'Other',
 ];
+
+export const LANGUAGE_FLAGS = {
+  English: '🇺🇸',
+  Spanish: '🇪🇸',
+  Mandarin: '🇨🇳',
+  Hindi: '🇮🇳',
+  French: '🇫🇷',
+  Portuguese: '🇵🇹',
+  Korean: '🇰🇷',
+  Japanese: '🇯🇵',
+  German: '🇩🇪',
+  Other: '🌐',
+};

@@ -165,8 +165,10 @@ app.get('/api/activities', async (req, res) => {
       SELECT activities.*,
         users.name AS creator_name,
         users.display_name AS creator_display_name,
+        users.profile_image AS creator_photo,
         (SELECT status FROM applications WHERE applications.activity_id = activities.id AND applications.user_id = $1) AS my_application_status,
-        (SELECT COUNT(*)::int FROM applications WHERE applications.activity_id = activities.id) AS application_count
+        (SELECT COUNT(*)::int FROM applications WHERE applications.activity_id = activities.id) AS application_count,
+        (SELECT COUNT(*)::int FROM applications WHERE applications.activity_id = activities.id AND applications.status = 'accepted') AS accepted_count
       FROM activities
       LEFT JOIN users ON activities.user_id = users.id
       ORDER BY activities.created_at DESC
@@ -279,7 +281,8 @@ app.get('/api/activities/:id/applications', async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT applications.*, users.name AS applicant_name, users.display_name AS applicant_display_name
+      SELECT applications.*, users.name AS applicant_name, users.display_name AS applicant_display_name,
+      users.profile_image AS applicant_photo, users.school_year AS applicant_school_year
       FROM applications
       JOIN users ON applications.user_id = users.id
       WHERE applications.activity_id = $1
