@@ -81,3 +81,16 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+
+/* Single source of truth for heading color. Change it here anytime —
+   using !important because something in the browser/OS is overriding
+   the normal Tailwind color utility on these elements. */
+
+.app-heading {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1a1816 !important;
+}

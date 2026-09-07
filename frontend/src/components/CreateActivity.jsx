@@ -69,7 +69,7 @@ export function CreateActivity({ editing, onDone }) {
         Back
       </button>
 
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl app-heading">
         {editing ? 'Edit activity' : 'Start an activity'}
       </h1>
       <p className="mt-1.5 text-sm text-muted-foreground">

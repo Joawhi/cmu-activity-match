@@ -76,8 +76,9 @@ export function ProfileModal() {
         ) : (
           <div className="flex flex-col items-center text-center">
             <Avatar name={displayName} photoUrl={photoUrlFrom(profile.profile_image)} size={96} />
-            <h2 className="mt-4 font-serif text-2xl font-semibold tracking-tight">{displayName}</h2>
-
+            <h2 className="mt-4 font-serif text-2xl font-semibold tracking-tight app-heading">
+              {displayName}
+            </h2>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               {profile.school_year && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
@@ -173,7 +174,9 @@ function EditProfileForm({ profile, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <h2 className="font-serif text-2xl font-semibold tracking-tight">Edit profile</h2>
+      <h2 className="font-serif text-2xl font-semibold tracking-tight app-heading">
+        Edit profile
+      </h2>
 
       <div className="flex items-center gap-4">
         <Avatar name={displayName || profile.name} photoUrl={previewUrl || photoUrlFrom(profile.profile_image)} size={72} />

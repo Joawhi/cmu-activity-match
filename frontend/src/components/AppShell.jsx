@@ -34,8 +34,8 @@ export function AppShell() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-2xl items-center justify-between px-4">
           <button type="button" onClick={() => setView('discover')} className="flex items-center gap-2 focus-visible:outline-none">
-            <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary font-serif text-base font-bold text-primary-foreground">
-              M
+            <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary font-serif text-base font-bold text-primary-foreground">
+              CMU
             </span>
             <span className="font-serif text-lg font-semibold tracking-tight">Activity Match</span>
           </button>

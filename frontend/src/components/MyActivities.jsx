@@ -19,7 +19,7 @@ export function MyActivities({ onCreate, onEdit }) {
     <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:py-8">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl app-heading">
             My activities
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">

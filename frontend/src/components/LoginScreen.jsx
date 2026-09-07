@@ -35,7 +35,7 @@ export function LoginScreen() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-7 sm:p-9">
-          <h1 className="text-center font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+          <h1 className="text-center font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl app-heading">
             Welcome to CMU Activity Match
           </h1>
           <p className="mx-auto mt-2.5 max-w-sm text-center text-sm leading-relaxed text-muted-foreground text-pretty">

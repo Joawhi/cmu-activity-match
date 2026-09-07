@@ -1,4 +1,4 @@
- CMU Activity Match
+# CMU Activity Match
 
 A web app for CMU students to create, discover, and join activities with other students.
 
@@ -11,13 +11,13 @@ Note: the backend is on Render's free tier, which "sleeps" after a period of no 
 
 ## Tech Stack
 
-- **Frontend:** React (Vite), deployed on Vercel
+- **Frontend:** React (Vite) + Tailwind CSS, deployed on Vercel
 - **Backend:** Node.js + Express, deployed on Render
 - **Database:** PostgreSQL (shared, hosted on Supabase) — everyone's local dev environment connects to the **same** database as production. Be mindful when testing: use obviously fake data, and clean it up in Supabase's Table Editor when needed.
 
 ## Project Structure
 cmu-activity-match/
-├── frontend/ # React app
+├── frontend/ # React app (Vite + Tailwind)
 ├── backend/ # Express API
 ├── PROJECT_CONTEXT.md # Full product scope and roadmap
 └── TODO.md # Future features not yet implemented
@@ -57,7 +57,8 @@ Runs on http://localhost:5173
 - [x] Simple user identification (name + CMU email, no password yet)
 - [x] User profile (display name, bio, school year, major, languages, photo)
 - [x] Request to join an activity (with optional note)
-- [ ] Manage applications (accept/decline) — next up
-- [ ] Real authentication (password)
+- [x] Manage applications (accept/decline)
+- [x] Visual redesign (Tailwind-based design system, avatars, category colors, mobile nav)
+- [ ] Real authentication (password) — next up
 
 See `TODO.md` for the full backlog.
