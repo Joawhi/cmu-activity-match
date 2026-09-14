@@ -29,6 +29,7 @@ function mapActivity(raw) {
     durationHours: raw.duration_hours == null ? null : Number(raw.duration_hours),
     // Already an absolute instant (ISO with offset) — never converted.
     applicationDeadline: raw.application_deadline || null,
+    requirements: raw.participation_requirements || '',
     myApplicationStatus: raw.my_application_status,
     applicationCount: raw.application_count || 0,
     acceptedCount: raw.accepted_count || 0,

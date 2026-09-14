@@ -58,6 +58,7 @@ async function setupTables() {
       transport_note TEXT,
       duration_hours NUMERIC(4,1),
       application_deadline TIMESTAMPTZ,
+      participation_requirements TEXT,
       user_id INTEGER REFERENCES users(id),
       created_at TIMESTAMP DEFAULT NOW()
     )
@@ -73,7 +74,8 @@ async function setupTables() {
       ADD COLUMN IF NOT EXISTS transport_method TEXT,
       ADD COLUMN IF NOT EXISTS transport_note TEXT,
       ADD COLUMN IF NOT EXISTS duration_hours NUMERIC(4,1),
-      ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ
+      ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS participation_requirements TEXT
   `);
 
   await pool.query(`
@@ -219,7 +221,7 @@ app.post('/api/users/:id/photo', upload.single('photo'), async (req, res) => {
 
 app.post('/api/activities', async (req, res) => {
   try {
-    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline } = req.body;
+    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline, participation_requirements } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -246,10 +248,10 @@ app.post('/api/activities', async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline, participation_requirements)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
       [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', user_id || null, budget.value, (budget_note || '').trim() || null,
-       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value]
+       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value, (participation_requirements || '').trim() || null]
     );
     res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
@@ -294,7 +296,7 @@ app.get('/api/activities', async (req, res) => {
 app.put('/api/activities/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline } = req.body;
+    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline, participation_requirements } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -332,10 +334,11 @@ app.put('/api/activities/:id', async (req, res) => {
       `UPDATE activities
        SET title = $1, description = $2, datetime = $3, location = $4, max_people = $5, category = $6, gender_restriction = $7,
            budget_total = $9, budget_note = $10,
-           transport_method = $11, transport_note = $12, duration_hours = $13, application_deadline = $14
+           transport_method = $11, transport_note = $12, duration_hours = $13, application_deadline = $14,
+           participation_requirements = $15
        WHERE id = $8`,
       [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', id, budget.value, (budget_note || '').trim() || null,
-       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value]
+       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value, (participation_requirements || '').trim() || null]
     );
     res.json({ success: true });
   } catch (err) {

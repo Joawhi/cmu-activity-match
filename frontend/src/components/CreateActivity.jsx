@@ -31,6 +31,7 @@ export function CreateActivity({ editing, onDone }) {
   const [deadline, setDeadline] = useState(isoToLocalInput(editing?.applicationDeadline));
   const [transportMethod, setTransportMethod] = useState(editing?.transportMethod ?? null);
   const [transportNote, setTransportNote] = useState(editing?.transportNote ?? '');
+  const [requirements, setRequirements] = useState(editing?.requirements ?? '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +62,7 @@ export function CreateActivity({ editing, onDone }) {
       application_deadline: localInputToIso(deadline),
       transport_method: transportMethod,
       transport_note: transportNote.trim(),
+      participation_requirements: requirements.trim(),
     };
 
     setSaving(true);
@@ -292,6 +294,17 @@ export function CreateActivity({ editing, onDone }) {
               );
             })}
           </div>
+        </Field>
+
+        <Field label="What should people bring or know? (optional)" htmlFor="requirements">
+          <textarea
+            id="requirements"
+            value={requirements}
+            onChange={(e) => setRequirements(e.target.value)}
+            rows={2}
+            placeholder="e.g. Bring your own skates, and be comfortable skating for an hour"
+            className={cn(inputClass, 'resize-none leading-relaxed')}
+          />
         </Field>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

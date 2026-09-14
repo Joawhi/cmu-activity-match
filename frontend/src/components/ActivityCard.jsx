@@ -107,6 +107,12 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
         </p>
       )}
 
+      {activity.requirements && (
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground text-pretty">
+          Requirements: {activity.requirements}
+        </p>
+      )}
+
       <div className="mt-4">
         <SpotsIndicator activity={activity} />
       </div>
