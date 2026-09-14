@@ -104,6 +104,15 @@ function parseBudgetTotal(raw) {
   return { ok: true, value };
 }
 
+// Group size (max_people) is the TOTAL headcount and includes the organizer,
+// so the most applicants that can be accepted is max_people - 1.
+// null/0 (legacy rows) means the activity has no limit.
+// Must stay in sync with isActivityFull() in frontend/src/lib/helpers.js.
+function isActivityFull(maxPeople, acceptedCount) {
+  const limit = Number(maxPeople) || 0;
+  return limit > 0 && (Number(acceptedCount) || 0) + 1 >= limit;
+}
+
 // Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
 const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
 
@@ -258,8 +267,17 @@ app.get('/api/activities', async (req, res) => {
         users.name AS creator_name,
         users.display_name AS creator_display_name,
         users.profile_image AS creator_photo,
-        (SELECT status FROM applications WHERE applications.activity_id = activities.id AND applications.user_id = $1) AS my_application_status,
-        (SELECT COUNT(*)::int FROM applications WHERE applications.activity_id = activities.id) AS application_count,
+        -- A person can withdraw and apply again, so (activity_id, user_id) is NOT
+        -- unique. LIMIT 1 is what keeps this scalar subquery legal — without it a
+        -- single re-application 500s this whole feed for every user. Order by id,
+        -- not created_at: created_at defaults to NOW(), which is the transaction
+        -- timestamp, so a withdraw and an immediate re-apply can tie.
+        (SELECT status FROM applications
+         WHERE applications.activity_id = activities.id AND applications.user_id = $1
+         ORDER BY applications.id DESC LIMIT 1) AS my_application_status,
+        (SELECT COUNT(*)::int FROM applications
+         WHERE applications.activity_id = activities.id
+           AND applications.status IS DISTINCT FROM 'withdrawn') AS application_count,
         (SELECT COUNT(*)::int FROM applications WHERE applications.activity_id = activities.id AND applications.status = 'accepted') AS accepted_count
       FROM activities
       LEFT JOIN users ON activities.user_id = users.id
@@ -354,7 +372,14 @@ app.post('/api/activities/:id/apply', async (req, res) => {
       return res.status(400).json({ error: 'user_id is required' });
     }
 
-    const activityResult = await pool.query('SELECT * FROM activities WHERE id = $1', [activityId]);
+    const activityResult = await pool.query(
+      `SELECT activities.*,
+         (SELECT COUNT(*)::int FROM applications
+          WHERE applications.activity_id = activities.id
+            AND applications.status = 'accepted') AS accepted_count
+       FROM activities WHERE activities.id = $1`,
+      [activityId]
+    );
     if (activityResult.rows.length === 0) {
       return res.status(404).json({ error: 'Activity not found' });
     }
@@ -369,12 +394,26 @@ app.post('/api/activities/:id/apply', async (req, res) => {
       return res.status(400).json({ error: 'The deadline to apply for this activity has passed' });
     }
 
+    // A withdrawn row is history, not a live application — that person may apply
+    // again. Anything else (pending/accepted/declined, or a legacy NULL) still
+    // blocks; re-applying after a decline stays disallowed. IS DISTINCT FROM is
+    // NULL-safe, where `<> 'withdrawn'` would yield NULL and let the row through.
     const existing = await pool.query(
-      'SELECT * FROM applications WHERE activity_id = $1 AND user_id = $2',
+      `SELECT 1 FROM applications
+       WHERE activity_id = $1 AND user_id = $2
+         AND status IS DISTINCT FROM 'withdrawn'
+       LIMIT 1`,
       [activityId, user_id]
     );
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'You already applied to this activity' });
+    }
+
+    // Evaluated live on every request — statuses are never batch-written, so a
+    // decline frees the spot again immediately.
+    const activity = activityResult.rows[0];
+    if (isActivityFull(activity.max_people, activity.accepted_count)) {
+      return res.status(400).json({ error: 'This activity is already full' });
     }
 
     const result = await pool.query(
@@ -382,6 +421,53 @@ app.post('/api/activities/:id/apply', async (req, res) => {
       [activityId, user_id, note || '']
     );
     res.status(201).json({ id: result.rows[0].id, status: 'pending' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Withdraw your own application: "Withdraw" a pending request, or "Leave" an
+// accepted place. Leaving frees the spot for free — accepted_count is derived
+// live, and a withdrawn row is not accepted.
+// The row is located by (activity_id, user_id), so a caller can only ever reach
+// their own application; there is no id to guess.
+// Deliberately NOT gated on the deadline: leaving must always be possible.
+app.delete('/api/activities/:id/apply', async (req, res) => {
+  try {
+    const activityId = req.params.id;
+    const userId = Number(req.query.user_id);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const activityResult = await pool.query('SELECT id FROM activities WHERE id = $1', [activityId]);
+    if (activityResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+
+    // One conditional statement, so there is no window between finding the row
+    // and writing it. Newest row wins, matching my_application_status.
+    // 'declined' is excluded on purpose: letting someone launder a rejection
+    // into a withdrawal would let them re-apply and undo the organizer.
+    const result = await pool.query(
+      `UPDATE applications SET status = 'withdrawn'
+       WHERE id = (
+         SELECT id FROM applications
+         WHERE activity_id = $1 AND user_id = $2
+           AND status IN ('pending', 'accepted')
+         ORDER BY id DESC
+         LIMIT 1
+       )
+       RETURNING id`,
+      [activityId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "You don't have an active request for this activity" });
+    }
+
+    res.json({ success: true, status: 'withdrawn' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -424,12 +510,19 @@ app.put('/api/applications/:id', async (req, res) => {
     const { id } = req.params;
     const { status, creator_id } = req.body;
 
+    // 'withdrawn' is intentionally absent and this check is load-bearing: only
+    // the applicant can withdraw, via DELETE /api/activities/:id/apply.
     if (!['accepted', 'declined'].includes(status)) {
       return res.status(400).json({ error: 'Status must be accepted or declined' });
     }
 
     const appResult = await pool.query(
-      `SELECT applications.*, activities.user_id AS activity_owner_id
+      `SELECT applications.*,
+         activities.user_id AS activity_owner_id,
+         activities.max_people,
+         (SELECT COUNT(*)::int FROM applications AS accepted
+          WHERE accepted.activity_id = applications.activity_id
+            AND accepted.status = 'accepted') AS accepted_count
        FROM applications
        JOIN activities ON applications.activity_id = activities.id
        WHERE applications.id = $1`,
@@ -441,6 +534,26 @@ app.put('/api/applications/:id', async (req, res) => {
     }
     if (appResult.rows[0].activity_owner_id !== creator_id) {
       return res.status(403).json({ error: 'Only the activity creator can manage this application' });
+    }
+
+    const application = appResult.rows[0];
+    // The organizer must not be able to pull someone back into a spot they
+    // chose to leave.
+    if (application.status === 'withdrawn') {
+      return res.status(400).json({ error: 'This person withdrew their request' });
+    }
+
+    // Declining must always work, even when full — that is how a spot is freed.
+    // Re-accepting someone already accepted is a no-op: accepted_count already
+    // counts this row, so skipping the check avoids a false "full".
+    // Not transactional: the only realistic race is one organizer double-clicking
+    // two different rows, whose worst case is one extra accepted person (the UI
+    // clamps and still reads "Full"). A conditional UPDATE would not fix it —
+    // under READ COMMITTED both statements read the pre-commit count — and the
+    // real fix (SELECT ... FOR UPDATE on the activity) is not worth it here.
+    if (status === 'accepted' && application.status !== 'accepted'
+        && isActivityFull(application.max_people, application.accepted_count)) {
+      return res.status(400).json({ error: 'This activity is already full' });
     }
 
     await pool.query('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);

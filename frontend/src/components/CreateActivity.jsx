@@ -165,6 +165,11 @@ export function CreateActivity({ editing, onDone }) {
               onChange={(e) => setCapacity(e.target.value)}
               className={inputClass}
             />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {groupSize === 1
+                ? 'Group size 1 means just you — no one else can join.'
+                : `Includes you, so ${groupSize - 1} other ${groupSize === 2 ? 'person' : 'people'} can join.`}
+            </p>
           </Field>
         </div>
 

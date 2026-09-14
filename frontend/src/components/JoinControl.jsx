@@ -1,32 +1,78 @@
 import { useState } from 'react';
-import { Check, Send } from 'lucide-react';
+import { Check, LogOut, Send } from 'lucide-react';
 import { useApp } from '../context/AppProvider';
-import { isDeadlinePassed } from '../lib/helpers';
+import { isDeadlinePassed, isActivityFull } from '../lib/helpers';
 
 export function JoinControl({ activity }) {
-  const { sendJoinRequest } = useApp();
+  const { sendJoinRequest, withdrawJoinRequest } = useApp();
   const [composing, setComposing] = useState(false);
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState('');
 
-  const isFull = activity.capacity > 0 && activity.acceptedCount >= activity.capacity;
+  // window.confirm matches the existing convention in ActivityCard's delete.
+  const handleWithdraw = async (confirmText) => {
+    if (!window.confirm(confirmText)) return;
+    setWithdrawing(true);
+    setError('');
+    try {
+      await withdrawJoinRequest(activity.id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  // Not styled as destructive: leaving is reversible — you can apply again.
+  const exitButtonClass =
+    'inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none active:translate-y-px disabled:opacity-50';
+
+  const isFull = isActivityFull(activity);
   const deadlinePassed = isDeadlinePassed(activity.applicationDeadline);
 
   if (activity.myApplicationStatus === 'accepted') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/12 px-4 py-2 text-sm font-semibold text-success">
-        <Check className="size-4" strokeWidth={2.5} />
-        You're in!
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/12 px-4 py-2 text-sm font-semibold text-success">
+            <Check className="size-4" strokeWidth={2.5} />
+            You're in!
+          </span>
+          <button
+            type="button"
+            onClick={() => handleWithdraw('Leave this activity? Your spot will open up for someone else.')}
+            disabled={withdrawing}
+            className={exitButtonClass}
+          >
+            <LogOut className="size-3.5" strokeWidth={2} />
+            {withdrawing ? 'Leaving…' : 'Leave'}
+          </button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
     );
   }
 
   if (activity.myApplicationStatus === 'pending') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">
-        Request sent
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground">
+            Request sent
+          </span>
+          <button
+            type="button"
+            onClick={() => handleWithdraw('Withdraw your request? You can send a new one later.')}
+            disabled={withdrawing}
+            className={exitButtonClass}
+          >
+            {withdrawing ? 'Withdrawing…' : 'Withdraw'}
+          </button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
     );
   }
 

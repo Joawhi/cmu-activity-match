@@ -44,6 +44,9 @@ export const api = {
   applyToActivity: (id, userId, note) =>
     request(`/activities/${id}/apply`, { method: 'POST', body: JSON.stringify({ user_id: userId, note }) }),
 
+  withdrawApplication: (id, userId) =>
+    request(`/activities/${id}/apply?user_id=${userId}`, { method: 'DELETE' }),
+
   getApplications: (activityId, creatorId) =>
     request(`/activities/${activityId}/applications?user_id=${creatorId}`),
 

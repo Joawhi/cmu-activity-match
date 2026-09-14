@@ -97,6 +97,13 @@ export function AppProvider({ children }) {
     await fetchActivities();
   };
 
+  // fetchActivities alone is enough: it re-derives myApplicationStatus, the
+  // accepted count behind the spots indicator, and the organizer's badge.
+  const withdrawJoinRequest = async (activityId) => {
+    await api.withdrawApplication(activityId, currentUser.id);
+    await fetchActivities();
+  };
+
   const loadRequests = async (activityId) => {
     const rows = await api.getApplications(activityId, currentUser.id);
     setRequestsByActivity((prev) => ({ ...prev, [activityId]: rows }));
@@ -137,6 +144,7 @@ export function AppProvider({ children }) {
     updateActivity,
     deleteActivity,
     sendJoinRequest,
+    withdrawJoinRequest,
     getRequestsForActivity,
     loadRequests,
     acceptRequest,

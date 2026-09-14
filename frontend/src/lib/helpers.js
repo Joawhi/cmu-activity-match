@@ -96,6 +96,30 @@ export function perPersonBudget(total, groupSize) {
   return (Number(total) || 0) / size;
 }
 
+// Capacity is the TOTAL headcount and includes the organizer — the same
+// assumption perPersonBudget makes. capacity 0 (legacy rows whose max_people
+// was never set) means "no limit".
+export function hasCapacityLimit(activity) {
+  return (Number(activity?.capacity) || 0) > 0;
+}
+
+// Spots taken = accepted applicants + the organizer.
+export function spotsFilled(activity) {
+  return (Number(activity?.acceptedCount) || 0) + 1;
+}
+
+// Never negative, so rows that went over capacity under the old rule read as 0.
+export function spotsRemaining(activity) {
+  if (!hasCapacityLimit(activity)) return Infinity;
+  return Math.max(0, Number(activity.capacity) - spotsFilled(activity));
+}
+
+// The single frontend definition of "full".
+// Must stay in sync with isActivityFull() in backend/server.js.
+export function isActivityFull(activity) {
+  return spotsRemaining(activity) === 0;
+}
+
 export function transportLabel(id) {
   return TRANSPORT_OPTIONS.find((opt) => opt.id === id)?.label || '';
 }

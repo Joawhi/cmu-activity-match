@@ -108,7 +108,7 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
       )}
 
       <div className="mt-4">
-        <SpotsIndicator filled={activity.acceptedCount} capacity={activity.capacity} />
+        <SpotsIndicator activity={activity} />
       </div>
 
       <div className="mt-5 border-t border-border pt-4">
@@ -159,7 +159,9 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
               </div>
             </div>
 
-            {showRequests ? <RequestList activityId={activity.id} requests={requests} /> : null}
+            {showRequests ? (
+              <RequestList activityId={activity.id} capacity={activity.capacity} requests={requests} />
+            ) : null}
           </div>
         )}
       </div>
