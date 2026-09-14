@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { CATEGORY_META } from '../lib/helpers';
-import { CATEGORIES } from '../constants';
+import { CATEGORY_META, formatMoney, perPersonBudget, isoToLocalInput, localInputToIso } from '../lib/helpers';
+import { CATEGORIES, TRANSPORT_OPTIONS } from '../constants';
 import { useApp } from '../context/AppProvider';
 import { cn } from '../lib/utils';
 
@@ -23,10 +23,25 @@ export function CreateActivity({ editing, onDone }) {
   const [location, setLocation] = useState(editing?.location ?? '');
   const [capacity, setCapacity] = useState(String(editing?.capacity ?? 4));
   const [whoCanJoin, setWhoCanJoin] = useState(editing?.whoCanJoin ?? 'none');
+  const [budgetTotal, setBudgetTotal] = useState(String(editing?.budgetTotal ?? ''));
+  const [budgetNote, setBudgetNote] = useState(editing?.budgetNote ?? '');
+  const [durationHours, setDurationHours] = useState(
+    editing?.durationHours != null ? String(editing.durationHours) : ''
+  );
+  const [deadline, setDeadline] = useState(isoToLocalInput(editing?.applicationDeadline));
+  const [transportMethod, setTransportMethod] = useState(editing?.transportMethod ?? null);
+  const [transportNote, setTransportNote] = useState(editing?.transportNote ?? '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const canSubmit = title.trim() && category && date && location.trim();
+  // 0 is allowed (a free activity), so check presence before converting —
+  // Number('') and Number(null) both produce 0.
+  const budgetNumber = Number(budgetTotal);
+  const budgetValid =
+    budgetTotal.trim() !== '' && Number.isFinite(budgetNumber) && budgetNumber >= 0;
+  const groupSize = Math.max(1, Number(capacity) || 1);
+
+  const canSubmit = title.trim() && category && date && location.trim() && budgetValid;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,6 +55,12 @@ export function CreateActivity({ editing, onDone }) {
       location: location.trim(),
       max_people: Math.max(1, Number(capacity) || 1),
       gender_restriction: whoCanJoin,
+      budget_total: budgetNumber,
+      budget_note: budgetNote.trim(),
+      duration_hours: durationHours.trim() === '' ? null : Number(durationHours),
+      application_deadline: localInputToIso(deadline),
+      transport_method: transportMethod,
+      transport_note: transportNote.trim(),
     };
 
     setSaving(true);
@@ -147,6 +168,66 @@ export function CreateActivity({ editing, onDone }) {
           </Field>
         </div>
 
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field label="How long will it take? (optional)" htmlFor="durationHours">
+            <input
+              id="durationHours"
+              type="number"
+              min={0.5}
+              max={24}
+              step={0.5}
+              inputMode="decimal"
+              value={durationHours}
+              onChange={(e) => setDurationHours(e.target.value)}
+              placeholder="e.g. 2.5"
+              className={inputClass}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">In hours. Half hours are fine.</p>
+          </Field>
+          <Field label="Last day to request a spot (optional)" htmlFor="deadline">
+            <input
+              id="deadline"
+              type="datetime-local"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className={inputClass}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              After this time, no one can request to join. Uses your local time.
+            </p>
+          </Field>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field label="Estimated budget (total, USD)" htmlFor="budgetTotal">
+            <input
+              id="budgetTotal"
+              type="number"
+              min={0}
+              step="0.01"
+              inputMode="decimal"
+              value={budgetTotal}
+              onChange={(e) => setBudgetTotal(e.target.value)}
+              placeholder="e.g. 120"
+              className={inputClass}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {budgetValid
+                ? `About ${formatMoney(perPersonBudget(budgetNumber, groupSize))} per person, split across ${groupSize} ${groupSize === 1 ? 'person' : 'people'} including you.`
+                : 'Enter a total for the whole group. Put 0 if it is free.'}
+            </p>
+          </Field>
+          <Field label="What is the budget mainly for? (optional)" htmlFor="budgetNote">
+            <input
+              id="budgetNote"
+              value={budgetNote}
+              onChange={(e) => setBudgetNote(e.target.value)}
+              placeholder="e.g. Tickets and snacks"
+              className={inputClass}
+            />
+          </Field>
+        </div>
+
         <Field label="Where" htmlFor="location">
           <input
             id="location"
@@ -154,6 +235,35 @@ export function CreateActivity({ editing, onDone }) {
             onChange={(e) => setLocation(e.target.value)}
             placeholder="e.g. The Strip District, Pittsburgh"
             className={inputClass}
+          />
+        </Field>
+
+        <Field label="How you'll get there (optional)">
+          <div className="flex flex-wrap gap-2">
+            {TRANSPORT_OPTIONS.map((opt) => {
+              const active = transportMethod === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTransportMethod(active ? null : opt.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+                    active ? 'border-transparent bg-foreground text-background' : 'border-border bg-background text-foreground hover:bg-secondary'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            value={transportNote}
+            onChange={(e) => setTransportNote(e.target.value)}
+            placeholder="Any details? e.g. Meeting at the 61C stop at 5:45"
+            aria-label="Transportation details"
+            className={cn(inputClass, 'mt-2')}
           />
         </Field>
 

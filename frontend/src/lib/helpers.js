@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { SERVER_URL } from '../api';
+import { TRANSPORT_OPTIONS } from '../constants';
 
 // Converts a filename stored in the database into a usable image URL.
 export function photoUrlFrom(filename) {
@@ -78,6 +79,53 @@ export function formatEventDate(iso) {
   const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return { date, time, label: `${date} · ${time}` };
+}
+
+export function formatMoney(amount) {
+  const n = Number(amount) || 0;
+  return `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+// Group size includes the organizer, so it is the divisor as-is.
+// Math.max(1, ...) guards older rows whose max_people is null or 0.
+export function perPersonBudget(total, groupSize) {
+  const size = Math.max(1, Number(groupSize) || 1);
+  return (Number(total) || 0) / size;
+}
+
+export function transportLabel(id) {
+  return TRANSPORT_OPTIONS.find((opt) => opt.id === id)?.label || '';
+}
+
+// <input type="datetime-local"> speaks wall-clock strings with no timezone.
+// These two functions are the only place that ambiguity is allowed to exist:
+// a value becomes an absolute instant the moment it leaves the form, and is
+// re-derived only when it goes back in.
+export function localInputToIso(value) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!match) return null;
+  const [, y, mo, d, h, mi] = match.map(Number);
+  const date = new Date(y, mo - 1, d, h, mi, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function isoToLocalInput(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// Matches the backend check exactly: both sides are epoch milliseconds.
+export function isDeadlinePassed(iso) {
+  if (!iso) return false;
+  const time = new Date(iso).getTime();
+  return !Number.isNaN(time) && time <= Date.now();
 }
 
 export function isSameDay(iso, ref) {

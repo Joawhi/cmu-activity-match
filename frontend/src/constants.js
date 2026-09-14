@@ -9,6 +9,15 @@ export const CATEGORIES = [
   'Other',
 ];
 
+// ids must stay in sync with TRANSPORT_METHODS in backend/server.js
+export const TRANSPORT_OPTIONS = [
+  { id: 'walk', label: 'Walk' },
+  { id: 'transit', label: 'Public transit' },
+  { id: 'drive', label: 'Drive' },
+  { id: 'rideshare', label: 'Rideshare' },
+  { id: 'bike', label: 'Bike' },
+];
+
 export const SCHOOL_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', "Master's", 'PhD', 'Other'];
 
 export const LANGUAGES = [

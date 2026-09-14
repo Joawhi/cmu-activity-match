@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Send } from 'lucide-react';
 import { useApp } from '../context/AppProvider';
+import { isDeadlinePassed } from '../lib/helpers';
 
 export function JoinControl({ activity }) {
   const { sendJoinRequest } = useApp();
@@ -10,6 +11,7 @@ export function JoinControl({ activity }) {
   const [error, setError] = useState('');
 
   const isFull = activity.capacity > 0 && activity.acceptedCount >= activity.capacity;
+  const deadlinePassed = isDeadlinePassed(activity.applicationDeadline);
 
   if (activity.myApplicationStatus === 'accepted') {
     return (
@@ -32,6 +34,17 @@ export function JoinControl({ activity }) {
     return (
       <span className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground">
         Not this time
+      </span>
+    );
+  }
+
+  // Ranked below the three application states (those describe a relationship
+  // the viewer already has) but above isFull: once closed, remaining spots are
+  // irrelevant and "Activity full" would be inaccurate.
+  if (deadlinePassed) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground">
+        Applications closed
       </span>
     );
   }

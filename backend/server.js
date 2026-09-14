@@ -52,9 +52,28 @@ async function setupTables() {
       max_people INTEGER,
       category TEXT,
       gender_restriction TEXT DEFAULT 'none',
+      budget_total NUMERIC(10,2) DEFAULT 0,
+      budget_note TEXT,
+      transport_method TEXT,
+      transport_note TEXT,
+      duration_hours NUMERIC(4,1),
+      application_deadline TIMESTAMPTZ,
       user_id INTEGER REFERENCES users(id),
       created_at TIMESTAMP DEFAULT NOW()
     )
+  `);
+
+  // CREATE TABLE IF NOT EXISTS does not add columns to a table that already
+  // exists, so any column added after the first deploy must also be declared
+  // here. Idempotent and additive — safe to run on every boot.
+  await pool.query(`
+    ALTER TABLE activities
+      ADD COLUMN IF NOT EXISTS budget_total NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS budget_note TEXT,
+      ADD COLUMN IF NOT EXISTS transport_method TEXT,
+      ADD COLUMN IF NOT EXISTS transport_note TEXT,
+      ADD COLUMN IF NOT EXISTS duration_hours NUMERIC(4,1),
+      ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ
   `);
 
   await pool.query(`
@@ -70,6 +89,58 @@ async function setupTables() {
 }
 
 setupTables().catch((err) => console.error('Error setting up tables:', err));
+
+// Returns { ok: true, value } or { ok: false, error }.
+// 0 is a valid budget (a free activity), so only missing, non-numeric or
+// negative values are rejected — never a falsy check.
+function parseBudgetTotal(raw) {
+  if (raw === undefined || raw === null || raw === '') {
+    return { ok: false, error: 'Estimated budget is required' };
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    return { ok: false, error: 'Estimated budget must be a number of 0 or more' };
+  }
+  return { ok: true, value };
+}
+
+// Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
+const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
+
+// The three fields below are optional: missing/null/'' parses to null.
+// But a value that IS supplied must be valid — never silently dropped.
+
+function parseTransportMethod(raw) {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, value: null };
+  if (typeof raw !== 'string' || !TRANSPORT_METHODS.includes(raw)) {
+    return { ok: false, error: `Transport method must be one of: ${TRANSPORT_METHODS.join(', ')}` };
+  }
+  return { ok: true, value: raw };
+}
+
+function parseDurationHours(raw) {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, value: null };
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0 || value > 24) {
+    return { ok: false, error: 'Estimated duration must be a number of hours between 0 and 24' };
+  }
+  return { ok: true, value };
+}
+
+// Only accepts an absolute instant. A zone-less string like '2026-10-03T18:00'
+// would be read in the server's timezone, which silently shifts the cutoff in
+// production — reject it so that class of bug cannot reach the database.
+function parseApplicationDeadline(raw) {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, value: null };
+  if (typeof raw !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/.test(raw)) {
+    return { ok: false, error: 'Application deadline must include a timezone offset' };
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return { ok: false, error: 'Application deadline is not a valid date' };
+  }
+  return { ok: true, value: date };
+}
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });
@@ -139,16 +210,37 @@ app.post('/api/users/:id/photo', upload.single('photo'), async (req, res) => {
 
 app.post('/api/activities', async (req, res) => {
   try {
-    const { title, description, datetime, location, max_people, category, gender_restriction, user_id } = req.body;
+    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
+    const budget = parseBudgetTotal(budget_total);
+    if (!budget.ok) {
+      return res.status(400).json({ error: budget.error });
+    }
+
+    const transport = parseTransportMethod(transport_method);
+    if (!transport.ok) {
+      return res.status(400).json({ error: transport.error });
+    }
+
+    const duration = parseDurationHours(duration_hours);
+    if (!duration.ok) {
+      return res.status(400).json({ error: duration.error });
+    }
+
+    const deadline = parseApplicationDeadline(application_deadline);
+    if (!deadline.ok) {
+      return res.status(400).json({ error: deadline.error });
+    }
+
     const result = await pool.query(
-      `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', user_id || null]
+      `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', user_id || null, budget.value, (budget_note || '').trim() || null,
+       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value]
     );
     res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
@@ -184,10 +276,30 @@ app.get('/api/activities', async (req, res) => {
 app.put('/api/activities/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, datetime, location, max_people, category, gender_restriction, user_id } = req.body;
+    const { title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const budget = parseBudgetTotal(budget_total);
+    if (!budget.ok) {
+      return res.status(400).json({ error: budget.error });
+    }
+
+    const transport = parseTransportMethod(transport_method);
+    if (!transport.ok) {
+      return res.status(400).json({ error: transport.error });
+    }
+
+    const duration = parseDurationHours(duration_hours);
+    if (!duration.ok) {
+      return res.status(400).json({ error: duration.error });
+    }
+
+    const deadline = parseApplicationDeadline(application_deadline);
+    if (!deadline.ok) {
+      return res.status(400).json({ error: deadline.error });
     }
 
     const existing = await pool.query('SELECT * FROM activities WHERE id = $1', [id]);
@@ -200,9 +312,12 @@ app.put('/api/activities/:id', async (req, res) => {
 
     await pool.query(
       `UPDATE activities
-       SET title = $1, description = $2, datetime = $3, location = $4, max_people = $5, category = $6, gender_restriction = $7
+       SET title = $1, description = $2, datetime = $3, location = $4, max_people = $5, category = $6, gender_restriction = $7,
+           budget_total = $9, budget_note = $10,
+           transport_method = $11, transport_note = $12, duration_hours = $13, application_deadline = $14
        WHERE id = $8`,
-      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', id]
+      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', id, budget.value, (budget_note || '').trim() || null,
+       transport.value, (transport_note || '').trim() || null, duration.value, deadline.value]
     );
     res.json({ success: true });
   } catch (err) {
@@ -245,6 +360,13 @@ app.post('/api/activities/:id/apply', async (req, res) => {
     }
     if (activityResult.rows[0].user_id === user_id) {
       return res.status(400).json({ error: "You can't apply to your own activity" });
+    }
+
+    // node-postgres parses TIMESTAMPTZ into a Date, so both sides here are
+    // epoch milliseconds — the result cannot shift with the server's timezone.
+    const deadlineValue = activityResult.rows[0].application_deadline;
+    if (deadlineValue && deadlineValue.getTime() <= Date.now()) {
+      return res.status(400).json({ error: 'The deadline to apply for this activity has passed' });
     }
 
     const existing = await pool.query(

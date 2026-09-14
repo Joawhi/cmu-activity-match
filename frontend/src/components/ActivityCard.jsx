@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, ChevronDown, Clock, MapPin, Pencil, Trash2, Users } from 'lucide-react';
-import { formatEventDate, relativeTime, photoUrlFrom } from '../lib/helpers';
+import { CalendarDays, ChevronDown, Clock, Hourglass, MapPin, Pencil, Route, Timer, Trash2, Users, Wallet } from 'lucide-react';
+import { formatEventDate, relativeTime, photoUrlFrom, formatMoney, perPersonBudget, transportLabel, isDeadlinePassed } from '../lib/helpers';
 import { cn } from '../lib/utils';
 import { useApp } from '../context/AppProvider';
 import { Avatar } from './Avatar';
@@ -67,7 +67,45 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
             {activity.location}
           </span>
         )}
+        <span className="inline-flex items-center gap-1.5">
+          <Wallet className="size-4 text-muted-foreground" strokeWidth={2} />
+          {formatMoney(activity.budgetTotal)} total
+          <span className="text-muted-foreground">·</span>
+          {formatMoney(perPersonBudget(activity.budgetTotal, activity.capacity))}/person
+        </span>
+        {activity.durationHours != null && (
+          <span className="inline-flex items-center gap-1.5">
+            <Hourglass className="size-4 text-muted-foreground" strokeWidth={2} />
+            {activity.durationHours} {activity.durationHours === 1 ? 'hour' : 'hours'}
+          </span>
+        )}
+        {activity.transportMethod && (
+          <span className="inline-flex items-center gap-1.5">
+            <Route className="size-4 text-muted-foreground" strokeWidth={2} />
+            {transportLabel(activity.transportMethod)}
+          </span>
+        )}
+        {activity.applicationDeadline && (
+          <span className="inline-flex items-center gap-1.5">
+            <Timer className="size-4 text-muted-foreground" strokeWidth={2} />
+            {isDeadlinePassed(activity.applicationDeadline)
+              ? 'Applications closed'
+              : `Apply by ${formatEventDate(activity.applicationDeadline).label}`}
+          </span>
+        )}
       </div>
+
+      {activity.budgetNote && (
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground text-pretty">
+          Budget covers: {activity.budgetNote}
+        </p>
+      )}
+
+      {activity.transportNote && (
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground text-pretty">
+          Getting there: {activity.transportNote}
+        </p>
+      )}
 
       <div className="mt-4">
         <SpotsIndicator filled={activity.acceptedCount} capacity={activity.capacity} />

@@ -19,6 +19,16 @@ function mapActivity(raw) {
     location: raw.location || '',
     capacity: raw.max_people || 0,
     whoCanJoin: raw.gender_restriction || 'none',
+    // budget_total is NUMERIC, which node-postgres returns as a string.
+    budgetTotal: Number(raw.budget_total) || 0,
+    budgetNote: raw.budget_note || '',
+    transportMethod: raw.transport_method || null,
+    transportNote: raw.transport_note || '',
+    // Unlike budget (where 0 is a real value), an unset duration must stay
+    // null — so no `|| 0` here.
+    durationHours: raw.duration_hours == null ? null : Number(raw.duration_hours),
+    // Already an absolute instant (ISO with offset) — never converted.
+    applicationDeadline: raw.application_deadline || null,
     myApplicationStatus: raw.my_application_status,
     applicationCount: raw.application_count || 0,
     acceptedCount: raw.accepted_count || 0,
