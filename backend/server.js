@@ -1,15 +1,49 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const multer = require('multer');
 const fs = require('fs');
+const { APPLICATION_STATUS, GENDER_RESTRICTION, TRANSPORT_METHODS } = require('./constants');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Only these origins are allowed to call this API.
+// TODO: add a custom domain here if the project gets one later.
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'https://cmu-activity-match-alpha.vercel.app',
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+}));
 app.use(express.json());
+
+// General limiter for the whole API, plus a stricter one for login
+// (login creates a new user row, so it's the most sensitive to abuse).
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again later.' },
+});
+app.use('/api/', apiLimiter);
 
 fs.mkdirSync('uploads', { recursive: true });
 app.use('/uploads', express.static('uploads'));
@@ -92,6 +126,12 @@ async function setupTables() {
 
 setupTables().catch((err) => console.error('Error setting up tables:', err));
 
+// Logs the real error server-side, but never sends internal details to the client.
+function handleServerError(err, res) {
+  console.error(err);
+  res.status(500).json({ error: 'Something went wrong. Please try again.' });
+}
+
 // Returns { ok: true, value } or { ok: false, error }.
 // 0 is a valid budget (a free activity), so only missing, non-numeric or
 // negative values are rejected — never a falsy check.
@@ -114,9 +154,6 @@ function isActivityFull(maxPeople, acceptedCount) {
   const limit = Number(maxPeople) || 0;
   return limit > 0 && (Number(acceptedCount) || 0) + 1 >= limit;
 }
-
-// Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
-const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
 
 // The three fields below are optional: missing/null/'' parses to null.
 // But a value that IS supplied must be valid — never silently dropped.
@@ -159,7 +196,7 @@ app.get('/api/health', (req, res) => {
 
 // "Log in": if this email already exists, return that user.
 // Otherwise create a new one. TODO: replace with real authentication.
-app.post('/api/users/login', async (req, res) => {
+app.post('/api/users/login', loginLimiter, async (req, res) => {
   try {
     const { name, email } = req.body;
 
@@ -178,7 +215,7 @@ app.post('/api/users/login', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -190,7 +227,7 @@ app.get('/api/users/:id', async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -203,7 +240,7 @@ app.put('/api/users/:id', async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -215,7 +252,7 @@ app.post('/api/users/:id/photo', upload.single('photo'), async (req, res) => {
     await pool.query('UPDATE users SET profile_image = $1 WHERE id = $2', [req.file.filename, req.params.id]);
     res.json({ success: true, filename: req.file.filename });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -250,12 +287,12 @@ app.post('/api/activities', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline, participation_requirements)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
-      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', user_id || null, budget.value, (budget_note || '').trim() || null,
+      [title, description, datetime, location, max_people || null, category, gender_restriction || GENDER_RESTRICTION.NONE, user_id || null, budget.value, (budget_note || '').trim() || null,
        transport.value, (transport_note || '').trim() || null, duration.value, deadline.value, (participation_requirements || '').trim() || null]
     );
     res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -289,7 +326,7 @@ app.get('/api/activities', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -337,12 +374,12 @@ app.put('/api/activities/:id', async (req, res) => {
            transport_method = $11, transport_note = $12, duration_hours = $13, application_deadline = $14,
            participation_requirements = $15
        WHERE id = $8`,
-      [title, description, datetime, location, max_people || null, category, gender_restriction || 'none', id, budget.value, (budget_note || '').trim() || null,
+      [title, description, datetime, location, max_people || null, category, gender_restriction || GENDER_RESTRICTION.NONE, id, budget.value, (budget_note || '').trim() || null,
        transport.value, (transport_note || '').trim() || null, duration.value, deadline.value, (participation_requirements || '').trim() || null]
     );
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -362,7 +399,7 @@ app.delete('/api/activities/:id', async (req, res) => {
     await pool.query('DELETE FROM activities WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -423,9 +460,9 @@ app.post('/api/activities/:id/apply', async (req, res) => {
       'INSERT INTO applications (activity_id, user_id, note) VALUES ($1, $2, $3) RETURNING id',
       [activityId, user_id, note || '']
     );
-    res.status(201).json({ id: result.rows[0].id, status: 'pending' });
+    res.status(201).json({ id: result.rows[0].id, status: APPLICATION_STATUS.PENDING });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -470,9 +507,9 @@ app.delete('/api/activities/:id/apply', async (req, res) => {
       return res.status(404).json({ error: "You don't have an active request for this activity" });
     }
 
-    res.json({ success: true, status: 'withdrawn' });
+    res.json({ success: true, status: APPLICATION_STATUS.WITHDRAWN });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -503,7 +540,7 @@ app.get('/api/activities/:id/applications', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
@@ -515,7 +552,7 @@ app.put('/api/applications/:id', async (req, res) => {
 
     // 'withdrawn' is intentionally absent and this check is load-bearing: only
     // the applicant can withdraw, via DELETE /api/activities/:id/apply.
-    if (!['accepted', 'declined'].includes(status)) {
+    if (![APPLICATION_STATUS.ACCEPTED, APPLICATION_STATUS.DECLINED].includes(status)) {
       return res.status(400).json({ error: 'Status must be accepted or declined' });
     }
 
@@ -542,7 +579,7 @@ app.put('/api/applications/:id', async (req, res) => {
     const application = appResult.rows[0];
     // The organizer must not be able to pull someone back into a spot they
     // chose to leave.
-    if (application.status === 'withdrawn') {
+    if (application.status === APPLICATION_STATUS.WITHDRAWN) {
       return res.status(400).json({ error: 'This person withdrew their request' });
     }
 
@@ -554,7 +591,7 @@ app.put('/api/applications/:id', async (req, res) => {
     // clamps and still reads "Full"). A conditional UPDATE would not fix it —
     // under READ COMMITTED both statements read the pre-commit count — and the
     // real fix (SELECT ... FOR UPDATE on the activity) is not worth it here.
-    if (status === 'accepted' && application.status !== 'accepted'
+    if (status === APPLICATION_STATUS.ACCEPTED && application.status !== APPLICATION_STATUS.ACCEPTED
         && isActivityFull(application.max_people, application.accepted_count)) {
       return res.status(400).json({ error: 'This activity is already full' });
     }
@@ -562,7 +599,7 @@ app.put('/api/applications/:id', async (req, res) => {
     await pool.query('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    handleServerError(err, res);
   }
 });
 
