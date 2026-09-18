@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, ChevronDown, Clock, Hourglass, MapPin, Pencil, Route, Timer, Trash2, Users, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronDown, Clock, Hourglass, MapPin, MessageCircle, Pencil, Route, Timer, Trash2, Users, Wallet } from 'lucide-react';
 import { formatEventDate, relativeTime, photoUrlFrom, formatMoney, perPersonBudget, transportLabel, isDeadlinePassed } from '../lib/helpers';
 import { cn } from '../lib/utils';
 import { useApp } from '../context/AppProvider';
@@ -9,8 +9,8 @@ import { SpotsIndicator } from './SpotsIndicator';
 import { JoinControl } from './JoinControl';
 import { RequestList } from './RequestList';
 
-export function ActivityCard({ activity, variant = 'discover', onEdit }) {
-  const { deleteActivity, openProfile, getRequestsForActivity, loadRequests } = useApp();
+export function ActivityCard({ activity, variant = 'discover', onEdit, showChat = false }) {
+  const { deleteActivity, openProfile, openChat, getRequestsForActivity, loadRequests } = useApp();
   const [showRequests, setShowRequests] = useState(false);
 
   const { date, time } = formatEventDate(activity.date);
@@ -119,7 +119,17 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
 
       <div className="mt-5 border-t border-border pt-4">
         {variant === 'discover' ? (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            {showChat && (
+              <button
+                type="button"
+                onClick={() => openChat(activity.id)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
+                <MessageCircle className="size-3.5" strokeWidth={2} />
+                Chat
+              </button>
+            )}
             <JoinControl activity={activity} />
           </div>
         ) : (
@@ -142,6 +152,16 @@ export function ActivityCard({ activity, variant = 'discover', onEdit }) {
               </button>
 
               <div className="flex items-center gap-2">
+                {showChat && (
+                  <button
+                    type="button"
+                    onClick={() => openChat(activity.id)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  >
+                    <MessageCircle className="size-3.5" strokeWidth={2} />
+                    Chat
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onEdit?.(activity)}

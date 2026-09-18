@@ -81,6 +81,11 @@ export function formatEventDate(iso) {
   return { date, time, label: `${date} · ${time}` };
 }
 
+export function formatMessageTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 export function formatMoney(amount) {
   const n = Number(amount) || 0;
   return `$${n.toLocaleString('en-US', {

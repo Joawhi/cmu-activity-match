@@ -8,6 +8,7 @@ const router = express.Router();
 
 // Accept or decline an application (only the activity's creator can do this)
 router.put('/:id', async (req, res) => {
+  let client;
   try {
     const { id } = req.params;
     const { status, creator_id } = req.body;
@@ -18,23 +19,26 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Status must be accepted or declined' });
     }
 
-    const appResult = await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const appResult = await client.query(
       `SELECT applications.*,
          activities.user_id AS activity_owner_id,
-         activities.max_people,
-         (SELECT COUNT(*)::int FROM applications AS accepted
-          WHERE accepted.activity_id = applications.activity_id
-            AND accepted.status = 'accepted') AS accepted_count
+         activities.max_people
        FROM applications
        JOIN activities ON applications.activity_id = activities.id
-       WHERE applications.id = $1`,
+       WHERE applications.id = $1
+       FOR UPDATE OF applications, activities`,
       [id]
     );
 
     if (appResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Application not found' });
     }
     if (appResult.rows[0].activity_owner_id !== creator_id) {
+      await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Only the activity creator can manage this application' });
     }
 
@@ -42,21 +46,55 @@ router.put('/:id', async (req, res) => {
     // The organizer must not be able to pull someone back into a spot they
     // chose to leave.
     if (application.status === APPLICATION_STATUS.WITHDRAWN) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'This person withdrew their request' });
     }
 
-    // Declining must always work, even when full — that is how a spot is freed.
-    // Not transactional: the only realistic race is one organizer double-clicking
-    // two different rows; the real fix (SELECT ... FOR UPDATE) is not worth it here.
-    if (status === APPLICATION_STATUS.ACCEPTED && application.status !== APPLICATION_STATUS.ACCEPTED
-        && isActivityFull(application.max_people, application.accepted_count)) {
-      return res.status(400).json({ error: 'This activity is already full' });
+    if (status === APPLICATION_STATUS.ACCEPTED && application.status !== APPLICATION_STATUS.ACCEPTED) {
+      const acceptedCountResult = await client.query(
+        `SELECT COUNT(*)::int AS accepted_count
+         FROM applications
+         WHERE activity_id = $1 AND status = 'accepted'`,
+        [application.activity_id]
+      );
+      const acceptedCount = acceptedCountResult.rows[0].accepted_count;
+      if (isActivityFull(application.max_people, acceptedCount)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'This activity is already full' });
+      }
     }
 
-    await pool.query('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+    await client.query('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+
+    if (status === APPLICATION_STATUS.ACCEPTED) {
+      await client.query(
+        `INSERT INTO chat_room_members (chat_room_id, user_id)
+         SELECT chat_rooms.id, applications.user_id
+         FROM chat_rooms
+         JOIN applications ON applications.activity_id = chat_rooms.activity_id
+         WHERE applications.id = $1
+         ON CONFLICT (chat_room_id, user_id) DO UPDATE SET left_at = NULL`,
+        [id]
+      );
+    } else if (application.status === APPLICATION_STATUS.ACCEPTED) {
+      await client.query(
+        `UPDATE chat_room_members
+         SET left_at = NOW()
+         WHERE chat_room_id = (SELECT id FROM chat_rooms WHERE activity_id = $1)
+           AND user_id = $2`,
+        [application.activity_id, application.user_id]
+      );
+    }
+
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 

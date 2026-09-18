@@ -63,6 +63,7 @@ function validateActivityInput(body) {
 }
 
 router.post('/', async (req, res) => {
+  let client;
   try {
     const { datetime, max_people, category, gender_restriction, user_id } = req.body;
 
@@ -72,15 +73,38 @@ router.post('/', async (req, res) => {
     }
     const a = parsed.value;
 
-    const result = await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `INSERT INTO activities (title, description, datetime, location, max_people, category, gender_restriction, user_id, budget_total, budget_note, transport_method, transport_note, duration_hours, application_deadline, participation_requirements)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
       [a.title, a.description, datetime, a.location, max_people || null, category, gender_restriction || GENDER_RESTRICTION.NONE, user_id || null,
-       a.budgetTotal, a.budgetNote, a.transportMethod, a.transportNote, a.durationHours, a.applicationDeadline, a.requirements]
+      a.budgetTotal, a.budgetNote, a.transportMethod, a.transportNote, a.durationHours, a.applicationDeadline, a.requirements]
     );
+
+    const chatRoomResult = await client.query(
+      'INSERT INTO chat_rooms (activity_id) VALUES ($1) ON CONFLICT (activity_id) DO UPDATE SET activity_id = EXCLUDED.activity_id RETURNING id',
+      [result.rows[0].id]
+    );
+
+    if (user_id) {
+      await client.query(
+        `INSERT INTO chat_room_members (chat_room_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (chat_room_id, user_id) DO NOTHING`,
+        [chatRoomResult.rows[0].id, user_id]
+      );
+    }
+    await client.query('COMMIT');
     res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 
@@ -154,7 +178,7 @@ router.put('/:id', async (req, res) => {
            participation_requirements = $15
        WHERE id = $8`,
       [a.title, a.description, datetime, a.location, max_people || null, category, gender_restriction || GENDER_RESTRICTION.NONE, id,
-       a.budgetTotal, a.budgetNote, a.transportMethod, a.transportNote, a.durationHours, a.applicationDeadline, a.requirements]
+      a.budgetTotal, a.budgetNote, a.transportMethod, a.transportNote, a.durationHours, a.applicationDeadline, a.requirements]
     );
     res.json({ success: true });
   } catch (err) {
@@ -257,6 +281,7 @@ router.post('/:id/apply', async (req, res) => {
 // their own application; there is no id to guess.
 // Deliberately NOT gated on the deadline: leaving must always be possible.
 router.delete('/:id/apply', async (req, res) => {
+  let client;
   try {
     const activityId = req.params.id;
     const userId = Number(req.query.user_id);
@@ -270,30 +295,52 @@ router.delete('/:id/apply', async (req, res) => {
       return res.status(404).json({ error: 'Activity not found' });
     }
 
-    // One conditional statement, so there is no window between finding the row
-    // and writing it. Newest row wins, matching my_application_status.
-    // 'declined' is excluded on purpose: letting someone launder a rejection
-    // into a withdrawal would let them re-apply and undo the organizer.
-    const result = await pool.query(
-      `UPDATE applications SET status = 'withdrawn'
-       WHERE id = (
-         SELECT id FROM applications
-         WHERE activity_id = $1 AND user_id = $2
-           AND status IN ('pending', 'accepted')
-         ORDER BY id DESC
-         LIMIT 1
-       )
-       RETURNING id`,
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    // Lock the newest active request so the membership timestamp and status
+    // change happen together.
+    const applicationResult = await client.query(
+      `SELECT id, status
+       FROM applications
+       WHERE activity_id = $1 AND user_id = $2
+         AND status IN ('pending', 'accepted')
+       ORDER BY id DESC
+       LIMIT 1
+       FOR UPDATE`,
       [activityId, userId]
     );
 
-    if (result.rowCount === 0) {
+    if (applicationResult.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: "You don't have an active request for this activity" });
     }
 
+    if (applicationResult.rows[0].status === APPLICATION_STATUS.ACCEPTED) {
+      await client.query(
+        `UPDATE chat_room_members
+         SET left_at = NOW()
+         WHERE user_id = $1
+           AND chat_room_id = (SELECT id FROM chat_rooms WHERE activity_id = $2)
+           AND left_at IS NULL`,
+        [userId, activityId]
+      );
+    }
+
+    await client.query(
+      'UPDATE applications SET status = \'withdrawn\' WHERE id = $1',
+      [applicationResult.rows[0].id]
+    );
+    await client.query('COMMIT');
+
     res.json({ success: true, status: APPLICATION_STATUS.WITHDRAWN });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 

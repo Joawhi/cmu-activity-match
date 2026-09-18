@@ -54,10 +54,10 @@ export function MyActivities({ onCreate, onEdit }) {
     },
   };
 
-  const renderCards = (items, variant) => (
+  const renderCards = (items, variant, showChat) => (
     <div className="flex flex-col gap-4">
       {items.map((activity) => (
-        <ActivityCard key={activity.id} activity={activity} variant={variant} onEdit={onEdit} />
+        <ActivityCard key={activity.id} activity={activity} variant={variant} showChat={showChat} onEdit={onEdit} />
       ))}
     </div>
   );
@@ -92,8 +92,8 @@ export function MyActivities({ onCreate, onEdit }) {
               onClick={() => setActiveSection(item.id)}
               aria-pressed={activeSection === item.id}
               className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${activeSection === item.id
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
             >
               {item.label} ({item.count})
@@ -112,8 +112,8 @@ export function MyActivities({ onCreate, onEdit }) {
                 onClick={() => setActiveSection(item.id)}
                 aria-pressed={activeSection === item.id}
                 className={`-ml-px flex w-full items-center justify-between border-l-2 px-4 py-2.5 text-left text-sm font-medium transition-colors ${activeSection === item.id
-                    ? 'border-primary bg-secondary/60 text-foreground'
-                    : 'border-transparent text-muted-foreground hover:border-primary hover:bg-secondary/60 hover:text-foreground'
+                  ? 'border-primary bg-secondary/60 text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-primary hover:bg-secondary/60 hover:text-foreground'
                   }`}
               >
                 <span>{item.label}</span>
@@ -139,7 +139,11 @@ export function MyActivities({ onCreate, onEdit }) {
                 onAction={sectionDetails[activeSection].emptyAction ? onCreate : undefined}
               />
             ) : (
-              renderCards(sections[activeSection], sectionDetails[activeSection].variant)
+              renderCards(
+                sections[activeSection],
+                sectionDetails[activeSection].variant,
+                activeSection === 'created' || activeSection === 'joined'
+              )
             )}
           </section>
         </div>

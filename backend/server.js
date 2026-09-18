@@ -8,6 +8,7 @@ const { corsOriginCheck, apiLimiter } = require('./utils/security');
 const usersRoutes = require('./routes/users.routes');
 const activitiesRoutes = require('./routes/activities.routes');
 const applicationsRoutes = require('./routes/applications.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,6 +29,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/users', usersRoutes);
 app.use('/api/activities', activitiesRoutes);
 app.use('/api/applications', applicationsRoutes);
+app.use('/api/chat', chatRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

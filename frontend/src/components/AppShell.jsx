@@ -8,9 +8,10 @@ import { CreateActivity } from './CreateActivity';
 import { MyActivities } from './MyActivities';
 import { ProfileModal } from './ProfileModal';
 import { photoUrlFrom } from '../lib/helpers';
+import { ChatWindow } from './ChatWindow';
 
 export function AppShell() {
-  const { currentUser, openProfile, logout } = useApp();
+  const { currentUser, openProfile, logout, activeChatActivityId } = useApp();
   const [view, setView] = useState('discover');
   const [editing, setEditing] = useState(null);
 
@@ -108,6 +109,7 @@ export function AppShell() {
       </nav>
 
       <ProfileModal />
+      {activeChatActivityId !== null && <ChatWindow activityId={activeChatActivityId} />}
     </div>
   );
 }

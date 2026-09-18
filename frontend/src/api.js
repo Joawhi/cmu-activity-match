@@ -55,4 +55,13 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ status, creator_id: creatorId }),
     }),
+
+  getChatMessages: (activityId, userId, afterId = 0) =>
+    request(`/chat/${activityId}/messages?user_id=${userId}&after_id=${afterId}`),
+
+  sendChatMessage: (activityId, userId, content) =>
+    request(`/chat/${activityId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, content }),
+    }),
 };

@@ -67,6 +67,73 @@ async function setupTables() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_rooms (
+      id SERIAL PRIMARY KEY,
+      activity_id INTEGER UNIQUE NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE chat_rooms
+      DROP CONSTRAINT IF EXISTS chat_rooms_activity_id_fkey,
+      ADD CONSTRAINT chat_rooms_activity_id_fkey
+      FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE
+  `);
+
+  await pool.query(`
+    INSERT INTO chat_rooms (activity_id)
+    SELECT activities.id
+    FROM activities
+    LEFT JOIN chat_rooms ON chat_rooms.activity_id = activities.id
+    WHERE chat_rooms.id IS NULL
+    ON CONFLICT (activity_id) DO NOTHING
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_room_members (
+      chat_room_id INTEGER NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (chat_room_id, user_id)
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE chat_room_members
+      ADD COLUMN IF NOT EXISTS left_at TIMESTAMP
+  `);
+
+  await pool.query(`
+    INSERT INTO chat_room_members (chat_room_id, user_id)
+    SELECT chat_rooms.id, activities.user_id
+    FROM chat_rooms
+    JOIN activities ON activities.id = chat_rooms.activity_id
+    WHERE activities.user_id IS NOT NULL
+    ON CONFLICT (chat_room_id, user_id) DO NOTHING
+  `);
+
+  await pool.query(`
+    INSERT INTO chat_room_members (chat_room_id, user_id)
+    SELECT chat_rooms.id, applications.user_id
+    FROM applications
+    JOIN chat_rooms ON chat_rooms.activity_id = applications.activity_id
+    WHERE applications.status = 'accepted'
+      AND applications.user_id IS NOT NULL
+    ON CONFLICT (chat_room_id, user_id) DO NOTHING
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id SERIAL PRIMARY KEY,
+      chat_room_id INTEGER NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 500),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 }
 
 module.exports = { pool, setupTables };
