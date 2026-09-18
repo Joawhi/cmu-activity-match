@@ -56,8 +56,12 @@ export const api = {
       body: JSON.stringify({ status, creator_id: creatorId }),
     }),
 
-  getChatMessages: (activityId, userId, afterId = 0) =>
-    request(`/chat/${activityId}/messages?user_id=${userId}&after_id=${afterId}`),
+  getChatMessages: (activityId, userId, { afterId, beforeId } = {}) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (afterId != null) params.set('after_id', afterId);
+    if (beforeId != null) params.set('before_id', beforeId);
+    return request(`/chat/${activityId}/messages?${params.toString()}`);
+  },
 
   sendChatMessage: (activityId, userId, content) =>
     request(`/chat/${activityId}/messages`, {

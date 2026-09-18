@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LoaderCircle, Send, X } from 'lucide-react';
 import { api } from '../api';
 import { formatMessageTime } from '../lib/helpers';
@@ -11,9 +11,14 @@ export function ChatWindow({ activityId }) {
     const [content, setContent] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
+    const [loadingEarlier, setLoadingEarlier] = useState(false);
+    const [hasEarlier, setHasEarlier] = useState(false);
     const [sending, setSending] = useState(false);
-    const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
     const lastMessageIdRef = useRef(0);
+    const oldestMessageIdRef = useRef(null);
+    const scrollToBottomRef = useRef(false);
+    const scrollAdjustmentRef = useRef(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -23,11 +28,21 @@ export function ChatWindow({ activityId }) {
             if (polling) return;
             polling = true;
             try {
-                const rows = await api.getChatMessages(activityId, currentUser.id, lastMessageIdRef.current);
+                const result = await api.getChatMessages(
+                    activityId,
+                    currentUser.id,
+                    initial ? {} : { afterId: lastMessageIdRef.current }
+                );
+                const rows = result.messages;
                 if (cancelled) return;
                 if (rows.length > 0) {
+                    if (initial) {
+                        oldestMessageIdRef.current = rows[0].id;
+                        setHasEarlier(result.hasEarlier);
+                    }
                     lastMessageIdRef.current = rows[rows.length - 1].id;
                     setMessages((previous) => initial ? rows : [...previous, ...rows]);
+                    scrollToBottomRef.current = true;
                 }
                 setError('');
             } catch (requestError) {
@@ -47,9 +62,47 @@ export function ChatWindow({ activityId }) {
         };
     }, [activityId, currentUser.id]);
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    useLayoutEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        if (scrollAdjustmentRef.current) {
+            const { top, height } = scrollAdjustmentRef.current;
+            container.scrollTop = top + (container.scrollHeight - height);
+            scrollAdjustmentRef.current = null;
+        } else if (scrollToBottomRef.current) {
+            container.scrollTop = container.scrollHeight;
+            scrollToBottomRef.current = false;
+        }
     }, [messages]);
+
+    const loadEarlierMessages = async () => {
+        if (loadingEarlier || oldestMessageIdRef.current === null) return;
+
+        const container = messagesContainerRef.current;
+        const previousHeight = container?.scrollHeight || 0;
+        const previousTop = container?.scrollTop || 0;
+        setLoadingEarlier(true);
+        setError('');
+        try {
+            const result = await api.getChatMessages(activityId, currentUser.id, {
+                beforeId: oldestMessageIdRef.current,
+            });
+            if (result.messages.length === 0) {
+                setHasEarlier(false);
+                return;
+            }
+
+            oldestMessageIdRef.current = result.messages[0].id;
+            setHasEarlier(result.hasEarlier);
+            scrollAdjustmentRef.current = { top: previousTop, height: previousHeight };
+            setMessages((previous) => [...result.messages, ...previous]);
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setLoadingEarlier(false);
+        }
+    };
 
     const sendMessage = async (event) => {
         event.preventDefault();
@@ -102,7 +155,7 @@ export function ChatWindow({ activityId }) {
                     </button>
                 </header>
 
-                <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
+                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
                     {loading ? (
                         <div className="flex h-full items-center justify-center text-muted-foreground">
                             <LoaderCircle className="size-5 animate-spin" aria-label="Loading messages" />
@@ -113,6 +166,19 @@ export function ChatWindow({ activityId }) {
                         </p>
                     ) : (
                         <div className="space-y-3">
+                            {(hasEarlier || loadingEarlier) && (
+                                <div className="flex justify-center pb-2">
+                                    <button
+                                        type="button"
+                                        onClick={loadEarlierMessages}
+                                        disabled={loadingEarlier}
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-wait disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                                    >
+                                        {loadingEarlier && <LoaderCircle className="size-3.5 animate-spin" />}
+                                        {loadingEarlier ? 'Loading earlier messages...' : 'Load earlier messages'}
+                                    </button>
+                                </div>
+                            )}
                             {messages.map((message, index) => {
                                 const ownMessage = message.sender_id === currentUser.id;
                                 const previous = messages[index - 1];
@@ -138,7 +204,6 @@ export function ChatWindow({ activityId }) {
                                     </div>
                                 );
                             })}
-                            <div ref={messagesEndRef} />
                         </div>
                     )}
                 </div>
