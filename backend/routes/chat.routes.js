@@ -30,6 +30,45 @@ async function findChatAccess(client, activityId, userId) {
     return { ...access, canReadHistory, canReadNew };
 }
 
+router.get('/', async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const userId = Number(req.query.user_id);
+        if (!userId) {
+            return res.status(400).json({ error: 'user_id is required' });
+        }
+
+        const result = await client.query(
+            `SELECT activities.id AS activity_id,
+                    activities.title AS activity_title,
+                    activities.created_at AS activity_created_at,
+                    latest.content AS last_message_content,
+                    latest.created_at AS last_message_created_at
+             FROM activities
+             JOIN chat_rooms ON chat_rooms.activity_id = activities.id
+             LEFT JOIN chat_room_members
+               ON chat_room_members.chat_room_id = chat_rooms.id
+              AND chat_room_members.user_id = $1
+             LEFT JOIN LATERAL (
+                 SELECT chat_messages.content, chat_messages.created_at
+                 FROM chat_messages
+                 WHERE chat_messages.chat_room_id = chat_rooms.id
+                 ORDER BY chat_messages.created_at DESC, chat_messages.id DESC
+                 LIMIT 1
+             ) latest ON true
+             WHERE activities.user_id = $1
+                OR (chat_room_members.user_id = $1 AND chat_room_members.left_at IS NULL)
+             ORDER BY latest.created_at DESC NULLS LAST, activities.created_at DESC`,
+            [userId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        handleServerError(err, res);
+    } finally {
+        client.release();
+    }
+});
+
 router.get('/:activityId/messages', async (req, res) => {
     const client = await pool.connect();
     try {
@@ -48,14 +87,14 @@ router.get('/:activityId/messages', async (req, res) => {
             return res.status(access ? 403 : 404).json({ error: access ? 'You are not a member of this chat' : 'Activity chat not found' });
         }
 
-                const visibility = `
+        const visibility = `
                  AND ($3 OR chat_messages.created_at <= $4)`;
-                let result;
-                let hasEarlier = false;
+        let result;
+        let hasEarlier = false;
 
-                if (hasAfterId) {
-                        result = await client.query(
-                                `SELECT chat_messages.id,
+        if (hasAfterId) {
+            result = await client.query(
+                `SELECT chat_messages.id,
               chat_messages.content,
               chat_messages.created_at,
               chat_messages.sender_id,
@@ -67,11 +106,11 @@ router.get('/:activityId/messages', async (req, res) => {
                  ${visibility}
              ORDER BY chat_messages.created_at ASC, chat_messages.id ASC
              LIMIT 50`,
-                                [access.chat_room_id, afterId || 0, access.canReadNew, access.left_at]
-                        );
-                } else {
-                        result = await client.query(
-                                `SELECT chat_messages.id,
+                [access.chat_room_id, afterId || 0, access.canReadNew, access.left_at]
+            );
+        } else {
+            result = await client.query(
+                `SELECT chat_messages.id,
                             chat_messages.content,
                             chat_messages.created_at,
                             chat_messages.sender_id,
@@ -83,26 +122,26 @@ router.get('/:activityId/messages', async (req, res) => {
                  ${visibility}
              ORDER BY chat_messages.created_at DESC, chat_messages.id DESC
              LIMIT 50`,
-                                [access.chat_room_id, beforeId, access.canReadNew, access.left_at]
-                        );
-                        result.rows.reverse();
+                [access.chat_room_id, beforeId, access.canReadNew, access.left_at]
+            );
+            result.rows.reverse();
 
-                        if (result.rows.length > 0) {
-                                const earlierResult = await client.query(
-                                        `SELECT EXISTS (
+            if (result.rows.length > 0) {
+                const earlierResult = await client.query(
+                    `SELECT EXISTS (
                                              SELECT 1
                                              FROM chat_messages
                                              WHERE chat_room_id = $1
                                                  AND id < $2
                                                  ${visibility}
                                          ) AS has_earlier`,
-                                        [access.chat_room_id, result.rows[0].id, access.canReadNew, access.left_at]
-                                );
-                                hasEarlier = earlierResult.rows[0].has_earlier;
-                        }
-                }
+                    [access.chat_room_id, result.rows[0].id, access.canReadNew, access.left_at]
+                );
+                hasEarlier = earlierResult.rows[0].has_earlier;
+            }
+        }
 
-                res.json({ messages: result.rows, hasEarlier });
+        res.json({ messages: result.rows, hasEarlier });
     } catch (err) {
         handleServerError(err, res);
     } finally {

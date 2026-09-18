@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarHeart, Compass, Plus } from 'lucide-react';
+import { CalendarHeart, Compass, MessageCircle, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useApp } from '../context/AppProvider';
 import { Avatar } from './Avatar';
@@ -8,33 +8,42 @@ import { CreateActivity } from './CreateActivity';
 import { MyActivities } from './MyActivities';
 import { ProfileModal } from './ProfileModal';
 import { photoUrlFrom } from '../lib/helpers';
-import { ChatWindow } from './ChatWindow';
+import { ChatModal } from './ChatWindow';
+import { Chats } from './Chats';
 
 export function AppShell() {
-  const { currentUser, openProfile, logout, activeChatActivityId } = useApp();
+  const { currentUser, openProfile, logout, activeChatActivityId, closeChat } = useApp();
   const [view, setView] = useState('discover');
   const [editing, setEditing] = useState(null);
 
   const goCreate = () => {
+    closeChat();
     setEditing(null);
     setView('create');
   };
 
   const goEdit = (activity) => {
+    closeChat();
     setEditing(activity);
     setView('create');
+  };
+
+  const goToView = (nextView) => {
+    closeChat();
+    setView(nextView);
   };
 
   const navItems = [
     { id: 'discover', label: 'Discover', icon: Compass },
     { id: 'mine', label: 'My activities', icon: CalendarHeart },
+    { id: 'chats', label: 'Chats', icon: MessageCircle },
   ];
 
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-2xl items-center justify-between px-4">
-          <button type="button" onClick={() => setView('discover')} className="flex items-center gap-2 focus-visible:outline-none">
+          <button type="button" onClick={() => goToView('discover')} className="flex items-center gap-2 focus-visible:outline-none">
             <span className="inline-flex size-10 items-center justify-center rounded-xl bg-primary font-serif text-base font-bold text-primary-foreground">
               CMU
             </span>
@@ -47,7 +56,7 @@ export function AppShell() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setView(item.id)}
+                  onClick={() => goToView(item.id)}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
                     view === item.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -88,14 +97,15 @@ export function AppShell() {
       <main>
         {view === 'discover' && <DiscoverFeed onCreate={goCreate} />}
         {view === 'mine' && <MyActivities onCreate={goCreate} onEdit={goEdit} />}
+        {view === 'chats' && <Chats />}
         {view === 'create' && (
           <CreateActivity editing={editing} onDone={() => setView(editing ? 'mine' : 'discover')} />
         )}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur-md sm:hidden">
-        <div className="mx-auto flex max-w-2xl items-center justify-around px-2 py-1.5">
-          <BottomTab active={view === 'discover'} label="Discover" icon={Compass} onClick={() => setView('discover')} />
+        <div className="mx-auto flex max-w-2xl items-center justify-around px-1 py-1.5">
+          <BottomTab active={view === 'discover'} label="Discover" icon={Compass} onClick={() => goToView('discover')} />
           <button
             type="button"
             onClick={goCreate}
@@ -103,13 +113,16 @@ export function AppShell() {
             className="inline-flex size-12 -translate-y-1 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:translate-y-0"
           >
             <Plus className="size-5" strokeWidth={2.5} />
+          <BottomTab active={view === 'chats'} label="Chats" icon={MessageCircle} onClick={() => goToView('chats')} />
           </button>
-          <BottomTab active={view === 'mine'} label="Mine" icon={CalendarHeart} onClick={() => setView('mine')} />
+          <BottomTab active={view === 'mine'} label="Mine" icon={CalendarHeart} onClick={() => goToView('mine')} />
         </div>
       </nav>
 
       <ProfileModal />
-      {activeChatActivityId !== null && <ChatWindow activityId={activeChatActivityId} />}
+      {activeChatActivityId !== null && view !== 'chats' && (
+        <ChatModal activityId={activeChatActivityId} onClose={closeChat} />
+      )}
     </div>
   );
 }

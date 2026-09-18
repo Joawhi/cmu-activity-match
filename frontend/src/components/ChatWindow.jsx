@@ -5,7 +5,7 @@ import { formatMessageTime } from '../lib/helpers';
 import { useApp } from '../context/AppProvider';
 
 export function ChatWindow({ activityId }) {
-    const { activities, currentUser, closeChat } = useApp();
+    const { activities, currentUser } = useApp();
     const activity = activities.find((item) => item.id === Number(activityId));
     const [messages, setMessages] = useState([]);
     const [content, setContent] = useState('');
@@ -131,31 +131,15 @@ export function ChatWindow({ activityId }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 p-0 sm:items-center sm:p-4" role="presentation">
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="chat-window-title"
-                className="flex h-[min(720px,90dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-xl sm:h-[min(720px,85dvh)] sm:rounded-2xl"
-            >
-                <header className="flex items-center justify-between border-b border-border px-5 py-4">
-                    <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Activity chat</p>
-                        <h2 id="chat-window-title" className="truncate font-serif text-xl font-semibold text-foreground">
-                            {activity?.title || 'Chat'}
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={closeChat}
-                        aria-label="Close chat"
-                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                    >
-                        <X className="size-5" strokeWidth={2} />
-                    </button>
-                </header>
+        <div className="flex min-h-0 flex-1 flex-col bg-card">
+            <header className="border-b border-border px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Activity chat</p>
+                <h2 id="chat-window-title" className="truncate font-serif text-xl font-semibold text-foreground">
+                    {activity?.title || 'Chat'}
+                </h2>
+            </header>
 
-                <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
+            <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
                     {loading ? (
                         <div className="flex h-full items-center justify-center text-muted-foreground">
                             <LoaderCircle className="size-5 animate-spin" aria-label="Loading messages" />
@@ -206,9 +190,9 @@ export function ChatWindow({ activityId }) {
                             })}
                         </div>
                     )}
-                </div>
+            </div>
 
-                <form onSubmit={sendMessage} className="border-t border-border px-4 py-3 sm:px-6">
+            <form onSubmit={sendMessage} className="border-t border-border px-4 py-3 sm:px-6">
                     {error && <p className="mb-2 text-xs text-destructive" role="alert">{error}</p>}
                     <div className="flex items-end gap-2">
                         <textarea
@@ -230,7 +214,31 @@ export function ChatWindow({ activityId }) {
                         </button>
                     </div>
                     <p className="mt-1.5 text-right text-[11px] text-muted-foreground">{content.length}/500</p>
-                </form>
+            </form>
+        </div>
+    );
+}
+
+export function ChatModal({ activityId, onClose }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 p-0 sm:items-center sm:p-4" role="presentation">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="chat-window-title"
+                className="relative flex h-[min(720px,90dvh)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-xl sm:h-[min(720px,85dvh)] sm:rounded-2xl"
+            >
+                <div className="absolute right-0 top-0 z-10 p-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close chat"
+                        className="inline-flex size-9 items-center justify-center rounded-full bg-card/80 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    >
+                        <X className="size-5" strokeWidth={2} />
+                    </button>
+                </div>
+                <ChatWindow activityId={activityId} />
             </div>
         </div>
     );

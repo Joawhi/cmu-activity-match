@@ -63,6 +63,8 @@ export const api = {
     return request(`/chat/${activityId}/messages?${params.toString()}`);
   },
 
+  getChatRooms: (userId) => request(`/chat?user_id=${userId}`),
+
   sendChatMessage: (activityId, userId, content) =>
     request(`/chat/${activityId}/messages`, {
       method: 'POST',
