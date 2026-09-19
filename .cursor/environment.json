@@ -1,0 +1,16 @@
+{
+  "name": "CMU Activity Match",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd backend && node server.js"
+    },
+    {
+      "name": "frontend",
+      "command": "cd frontend && npm run dev -- --host"
+    }
+  ],
+  "ports": [3001, 5173]
+}
