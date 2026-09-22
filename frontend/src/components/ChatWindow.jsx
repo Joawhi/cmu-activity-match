@@ -134,7 +134,7 @@ export function ChatWindow({ activityId }) {
         <div className="flex min-h-0 flex-1 flex-col bg-card">
             <header className="border-b border-border px-5 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Activity chat</p>
-                <h2 id="chat-window-title" className="truncate font-serif text-xl font-semibold text-foreground">
+                <h2 id="chat-window-title" className="chat-activity-title truncate">
                     {activity?.title || 'Chat'}
                 </h2>
             </header>

@@ -52,7 +52,7 @@ export function Chats() {
       <div className="grid min-h-[min(680px,calc(100dvh-12rem))] overflow-hidden rounded-2xl border border-border bg-card lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
         <aside className="border-b border-border lg:border-b-0 lg:border-r" aria-label="Chat conversations">
           <div className="border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold text-foreground">Conversations</h2>
+            <h2 className="chat-section-label">Conversations</h2>
           </div>
           {loading ? (
             <p className="px-5 py-6 text-sm text-muted-foreground">Loading chats...</p>
@@ -77,7 +77,7 @@ export function Chats() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-foreground">{room.activity_title}</span>
+                      <span className="chat-list-title truncate text-sm font-semibold">{room.activity_title}</span>
                       {room.last_message_created_at && (
                         <time className="shrink-0 text-[11px] text-muted-foreground">
                           {formatRoomTime(room.last_message_created_at)}
