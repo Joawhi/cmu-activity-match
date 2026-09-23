@@ -9,7 +9,7 @@ import { SpotsIndicator } from './SpotsIndicator';
 import { JoinControl } from './JoinControl';
 import { RequestList } from './RequestList';
 
-export function ActivityCard({ activity, variant = 'discover', onEdit, showChat = false }) {
+export function ActivityCard({ activity, variant = 'discover', onEdit, showChat = false, highlighted = false }) {
   const { deleteActivity, openProfile, openChat, getRequestsForActivity, loadRequests } = useApp();
   const [showRequests, setShowRequests] = useState(false);
 
@@ -23,7 +23,13 @@ export function ActivityCard({ activity, variant = 'discover', onEdit, showChat 
   }, [showRequests, requests, activity.id, loadRequests]);
 
   return (
-    <article className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+    <article
+      id={`activity-card-${activity.id}`}
+      className={cn(
+        'rounded-2xl border border-border bg-card p-5 sm:p-6',
+        highlighted && 'ring-2 ring-primary'
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"

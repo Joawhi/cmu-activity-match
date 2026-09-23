@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { CATEGORY_META, isSameDay } from '../lib/helpers';
 import { CATEGORIES } from '../constants';
@@ -14,7 +14,7 @@ const WHO_OPTIONS = [
   { id: 'female', label: 'Female only' },
 ];
 
-export function DiscoverFeed({ onCreate }) {
+export function DiscoverFeed({ onCreate, focusActivityId = null }) {
   const { activities, loading, currentUser } = useApp();
   const [query, setQuery] = useState('');
   const [categories, setCategories] = useState(new Set());
@@ -55,6 +55,17 @@ export function DiscoverFeed({ onCreate }) {
       })
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [activities, categories, who, dateFilter, query, currentUser]);
+
+  const visible = useMemo(() => {
+    if (!focusActivityId || filtered.some((activity) => activity.id === focusActivityId)) return filtered;
+    const focused = activities.find((activity) => activity.id === focusActivityId && activity.hostId !== currentUser.id);
+    return focused ? [focused, ...filtered] : filtered;
+  }, [filtered, focusActivityId, activities, currentUser]);
+
+  useEffect(() => {
+    if (!focusActivityId || loading) return;
+    document.getElementById(`activity-card-${focusActivityId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusActivityId, loading, visible]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:py-8">
@@ -111,7 +122,7 @@ export function DiscoverFeed({ onCreate }) {
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : filtered.length === 0 ? (
+        ) : visible.length === 0 ? (
           <EmptyState
             title="No activities match your filters"
             description="Try clearing a filter or two — or be the one who starts something. Someone out there is hoping you will."
@@ -119,7 +130,9 @@ export function DiscoverFeed({ onCreate }) {
             onAction={onCreate}
           />
         ) : (
-          filtered.map((a) => <ActivityCard key={a.id} activity={a} />)
+          visible.map((a) => (
+            <ActivityCard key={a.id} activity={a} highlighted={a.id === focusActivityId} />
+          ))
         )}
       </div>
     </div>

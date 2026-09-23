@@ -1,12 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useApp } from '../context/AppProvider';
 import { ActivityCard } from './ActivityCard';
 import { EmptyState } from './EmptyState';
 
-export function MyActivities({ onCreate, onEdit }) {
+export function MyActivities({ onCreate, onEdit, focusActivityId = null, focusSection = null }) {
   const { activities, currentUser } = useApp();
   const [activeSection, setActiveSection] = useState('created');
+
+  useEffect(() => {
+    if (focusSection) setActiveSection(focusSection);
+  }, [focusSection]);
+
+  useEffect(() => {
+    if (!focusActivityId) return;
+    document.getElementById(`activity-card-${focusActivityId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusActivityId, activeSection]);
 
   const sections = useMemo(() => {
     const sortByDate = (items) => items.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -57,7 +66,14 @@ export function MyActivities({ onCreate, onEdit }) {
   const renderCards = (items, variant, showChat) => (
     <div className="flex flex-col gap-4">
       {items.map((activity) => (
-        <ActivityCard key={activity.id} activity={activity} variant={variant} showChat={showChat} onEdit={onEdit} />
+        <ActivityCard
+          key={activity.id}
+          activity={activity}
+          variant={variant}
+          showChat={showChat}
+          onEdit={onEdit}
+          highlighted={activity.id === focusActivityId}
+        />
       ))}
     </div>
   );

@@ -10,11 +10,13 @@ import { ProfileModal } from './ProfileModal';
 import { photoUrlFrom } from '../lib/helpers';
 import { ChatModal } from './ChatWindow';
 import { Chats } from './Chats';
+import { NotificationCenter } from './NotificationCenter';
 
 export function AppShell() {
-  const { currentUser, openProfile, logout, activeChatActivityId, closeChat } = useApp();
+  const { currentUser, openProfile, logout, activeChatActivityId, closeChat, activities } = useApp();
   const [view, setView] = useState('discover');
   const [editing, setEditing] = useState(null);
+  const [activityFocus, setActivityFocus] = useState(null);
 
   const goCreate = () => {
     closeChat();
@@ -31,6 +33,33 @@ export function AppShell() {
   const goToView = (nextView) => {
     closeChat();
     setView(nextView);
+  };
+
+  const openRelatedActivity = (activityId) => {
+    const activity = activities.find((item) => item.id === activityId);
+    closeChat();
+    if (!activity) {
+      setActivityFocus({ id: activityId, section: null });
+      setView('discover');
+      return;
+    }
+    if (activity.hostId === currentUser.id) {
+      setActivityFocus({ id: activityId, section: 'created' });
+      setView('mine');
+      return;
+    }
+    if (activity.myApplicationStatus === 'accepted') {
+      setActivityFocus({ id: activityId, section: 'joined' });
+      setView('mine');
+      return;
+    }
+    if (activity.myApplicationStatus === 'pending') {
+      setActivityFocus({ id: activityId, section: 'pending' });
+      setView('mine');
+      return;
+    }
+    setActivityFocus({ id: activityId, section: null });
+    setView('discover');
   };
 
   const navItems = [
@@ -75,6 +104,7 @@ export function AppShell() {
               <Plus className="size-4" strokeWidth={2.5} />
               Create
             </button>
+            <NotificationCenter onOpenActivity={openRelatedActivity} />
             <button
               type="button"
               onClick={logout}
@@ -95,8 +125,17 @@ export function AppShell() {
       </header>
 
       <main>
-        {view === 'discover' && <DiscoverFeed onCreate={goCreate} />}
-        {view === 'mine' && <MyActivities onCreate={goCreate} onEdit={goEdit} />}
+        {view === 'discover' && (
+          <DiscoverFeed onCreate={goCreate} focusActivityId={activityFocus?.section == null ? activityFocus?.id : null} />
+        )}
+        {view === 'mine' && (
+          <MyActivities
+            onCreate={goCreate}
+            onEdit={goEdit}
+            focusActivityId={activityFocus?.section ? activityFocus.id : null}
+            focusSection={activityFocus?.section || null}
+          />
+        )}
         {view === 'chats' && <Chats />}
         {view === 'create' && (
           <CreateActivity editing={editing} onDone={() => setView(editing ? 'mine' : 'discover')} />

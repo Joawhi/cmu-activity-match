@@ -70,4 +70,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ user_id: userId, content }),
     }),
+
+  getNotifications: (userId) => request(`/notifications?user_id=${userId}`),
+
+  markNotificationRead: (id, userId) =>
+    request(`/notifications/${id}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({ user_id: userId }),
+    }),
+
+  markAllNotificationsRead: (userId) =>
+    request('/notifications/read-all', {
+      method: 'PUT',
+      body: JSON.stringify({ user_id: userId }),
+    }),
 };
