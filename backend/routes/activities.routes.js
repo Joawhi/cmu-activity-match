@@ -1,7 +1,8 @@
 const express = require('express');
 const { pool } = require('../db');
 const { handleServerError } = require('../utils/errors');
-const { GENDER_RESTRICTION, APPLICATION_STATUS } = require('../constants');
+const { GENDER_RESTRICTION, APPLICATION_STATUS, NOTIFICATION_TYPE } = require('../constants');
+const { insertNotification, displayName, notifyApplicants } = require('../utils/notifications');
 const {
   parseRequiredText,
   parseOptionalText,
@@ -60,6 +61,41 @@ function validateActivityInput(body) {
       requirements: requirements.value,
     },
   };
+}
+
+function asText(value) {
+  return value == null ? '' : String(value).trim();
+}
+
+function asNumber(value) {
+  if (value == null || value === '') return '';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? String(parsed) : asText(value);
+}
+
+function asTime(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? asText(value) : String(parsed.getTime());
+}
+
+function activityDetailsChanged(existing, next) {
+  return (
+    asText(existing.title) !== asText(next.title) ||
+    asText(existing.description) !== asText(next.description) ||
+    asText(existing.datetime) !== asText(next.datetime) ||
+    asText(existing.location) !== asText(next.location) ||
+    asNumber(existing.max_people) !== asNumber(next.maxPeople) ||
+    asText(existing.category) !== asText(next.category) ||
+    asText(existing.gender_restriction) !== asText(next.genderRestriction) ||
+    asNumber(existing.budget_total) !== asNumber(next.budgetTotal) ||
+    asText(existing.budget_note) !== asText(next.budgetNote) ||
+    asText(existing.transport_method) !== asText(next.transportMethod) ||
+    asText(existing.transport_note) !== asText(next.transportNote) ||
+    asNumber(existing.duration_hours) !== asNumber(next.durationHours) ||
+    asTime(existing.application_deadline) !== asTime(next.applicationDeadline) ||
+    asText(existing.participation_requirements) !== asText(next.requirements)
+  );
 }
 
 router.post('/', async (req, res) => {
@@ -152,6 +188,7 @@ router.get('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
+  let client;
   try {
     const { id } = req.params;
     const { datetime, max_people, category, gender_restriction, user_id } = req.body;
@@ -161,6 +198,13 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: parsed.error });
     }
     const a = parsed.value;
+    const stored = {
+      ...a,
+      datetime,
+      maxPeople: max_people || null,
+      category,
+      genderRestriction: gender_restriction || GENDER_RESTRICTION.NONE,
+    };
 
     const existing = await pool.query('SELECT * FROM activities WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
@@ -170,19 +214,39 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit your own activities' });
     }
 
-    await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await client.query(
       `UPDATE activities
        SET title = $1, description = $2, datetime = $3, location = $4, max_people = $5, category = $6, gender_restriction = $7,
            budget_total = $9, budget_note = $10,
            transport_method = $11, transport_note = $12, duration_hours = $13, application_deadline = $14,
            participation_requirements = $15
        WHERE id = $8`,
-      [a.title, a.description, datetime, a.location, max_people || null, category, gender_restriction || GENDER_RESTRICTION.NONE, id,
-      a.budgetTotal, a.budgetNote, a.transportMethod, a.transportNote, a.durationHours, a.applicationDeadline, a.requirements]
+      [stored.title, stored.description, stored.datetime, stored.location, stored.maxPeople, stored.category, stored.genderRestriction, id,
+      stored.budgetTotal, stored.budgetNote, stored.transportMethod, stored.transportNote, stored.durationHours, stored.applicationDeadline, stored.requirements]
     );
+
+    if (activityDetailsChanged(existing.rows[0], stored)) {
+      await notifyApplicants(client, {
+        activityId: id,
+        excludeUserId: user_id,
+        statuses: [APPLICATION_STATUS.ACCEPTED, APPLICATION_STATUS.PENDING],
+        type: NOTIFICATION_TYPE.ACTIVITY_UPDATED,
+        title: 'Activity updated',
+        body: `${stored.title} was updated.`,
+      });
+    }
+
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 
@@ -207,6 +271,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 router.post('/:id/apply', async (req, res) => {
+  let client;
   try {
     const activityId = req.params.id;
     const { user_id, note } = req.body;
@@ -264,13 +329,38 @@ router.post('/:id/apply', async (req, res) => {
       return res.status(400).json({ error: 'This activity is already full' });
     }
 
-    const result = await pool.query(
+    const applicantName = await displayName(pool, user_id);
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const result = await client.query(
       'INSERT INTO applications (activity_id, user_id, note) VALUES ($1, $2, $3) RETURNING id',
       [activityId, user_id, noteParsed.value || '']
     );
+    await insertNotification(client, {
+      userId: user_id,
+      type: NOTIFICATION_TYPE.APPLICATION_SUBMITTED,
+      title: 'Application sent',
+      body: `You applied to ${activity.title}.`,
+      activityId,
+    });
+    if (activity.user_id) {
+      await insertNotification(client, {
+        userId: activity.user_id,
+        type: NOTIFICATION_TYPE.APPLICATION_RECEIVED,
+        title: 'New application',
+        body: `${applicantName} applied to ${activity.title}.`,
+        activityId,
+      });
+    }
+    await client.query('COMMIT');
     res.status(201).json({ id: result.rows[0].id, status: APPLICATION_STATUS.PENDING });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 
@@ -301,13 +391,16 @@ router.delete('/:id/apply', async (req, res) => {
     // Lock the newest active request so the membership timestamp and status
     // change happen together.
     const applicationResult = await client.query(
-      `SELECT id, status
+      `SELECT applications.id, applications.status,
+              activities.user_id AS organizer_id,
+              activities.title
        FROM applications
-       WHERE activity_id = $1 AND user_id = $2
-         AND status IN ('pending', 'accepted')
-       ORDER BY id DESC
+       JOIN activities ON activities.id = applications.activity_id
+       WHERE applications.activity_id = $1 AND applications.user_id = $2
+         AND applications.status IN ('pending', 'accepted')
+       ORDER BY applications.id DESC
        LIMIT 1
-       FOR UPDATE`,
+       FOR UPDATE OF applications`,
       [activityId, userId]
     );
 
@@ -327,10 +420,26 @@ router.delete('/:id/apply', async (req, res) => {
       );
     }
 
+    const application = applicationResult.rows[0];
     await client.query(
       'UPDATE applications SET status = \'withdrawn\' WHERE id = $1',
-      [applicationResult.rows[0].id]
+      [application.id]
     );
+
+    if (application.organizer_id && application.organizer_id !== userId) {
+      const applicantName = await displayName(client, userId);
+      const left = application.status === APPLICATION_STATUS.ACCEPTED;
+      await insertNotification(client, {
+        userId: application.organizer_id,
+        type: left ? NOTIFICATION_TYPE.PARTICIPANT_LEFT : NOTIFICATION_TYPE.APPLICATION_WITHDRAWN,
+        title: left ? 'Someone left' : 'Application withdrawn',
+        body: left
+          ? `${applicantName} left ${application.title}.`
+          : `${applicantName} withdrew their application to ${application.title}.`,
+        activityId,
+      });
+    }
+
     await client.query('COMMIT');
 
     res.json({ success: true, status: APPLICATION_STATUS.WITHDRAWN });

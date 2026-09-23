@@ -1,8 +1,9 @@
 const express = require('express');
 const { pool } = require('../db');
 const { handleServerError } = require('../utils/errors');
-const { APPLICATION_STATUS } = require('../constants');
+const { APPLICATION_STATUS, NOTIFICATION_TYPE } = require('../constants');
 const { isActivityFull } = require('../utils/validators');
+const { insertNotification } = require('../utils/notifications');
 
 const router = express.Router();
 
@@ -25,9 +26,12 @@ router.put('/:id', async (req, res) => {
     const appResult = await client.query(
       `SELECT applications.*,
          activities.user_id AS activity_owner_id,
-         activities.max_people
+         activities.max_people,
+         activities.title AS activity_title,
+         COALESCE(NULLIF(users.display_name, ''), NULLIF(users.name, ''), 'Someone') AS applicant_name
        FROM applications
        JOIN activities ON applications.activity_id = activities.id
+       JOIN users ON users.id = applications.user_id
        WHERE applications.id = $1
        FOR UPDATE OF applications, activities`,
       [id]
@@ -84,6 +88,42 @@ router.put('/:id', async (req, res) => {
            AND user_id = $2`,
         [application.activity_id, application.user_id]
       );
+    }
+
+    if (status !== application.status) {
+      if (status === APPLICATION_STATUS.ACCEPTED) {
+        await insertNotification(client, {
+          userId: application.user_id,
+          type: NOTIFICATION_TYPE.APPLICATION_ACCEPTED,
+          title: "You're in",
+          body: `You were accepted to ${application.activity_title}.`,
+          activityId: application.activity_id,
+        });
+
+        const acceptedNow = await client.query(
+          `SELECT COUNT(*)::int AS accepted_count
+           FROM applications
+           WHERE activity_id = $1 AND status = 'accepted'`,
+          [application.activity_id]
+        );
+        if (isActivityFull(application.max_people, acceptedNow.rows[0].accepted_count)) {
+          await insertNotification(client, {
+            userId: application.activity_owner_id,
+            type: NOTIFICATION_TYPE.ACTIVITY_FULL,
+            title: 'Activity is full',
+            body: `${application.activity_title} has reached capacity.`,
+            activityId: application.activity_id,
+          });
+        }
+      } else if (status === APPLICATION_STATUS.DECLINED) {
+        await insertNotification(client, {
+          userId: application.user_id,
+          type: NOTIFICATION_TYPE.APPLICATION_DECLINED,
+          title: 'Application update',
+          body: `Your application to ${application.activity_title} was declined.`,
+          activityId: application.activity_id,
+        });
+      }
     }
 
     await client.query('COMMIT');

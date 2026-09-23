@@ -126,6 +126,32 @@ async function setupTables() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      activity_id INTEGER REFERENCES activities(id) ON DELETE CASCADE,
+      read_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS notifications_user_created_idx
+      ON notifications (user_id, created_at DESC)
+  `);
+
+  // One upcoming reminder per person per activity. A later visit must not
+  // create a second copy of the same reminder.
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS notifications_one_reminder_idx
+      ON notifications (user_id, activity_id)
+      WHERE type = 'activity_reminder'
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id SERIAL PRIMARY KEY,
       chat_room_id INTEGER NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,

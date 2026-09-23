@@ -5,6 +5,18 @@ const APPLICATION_STATUS = {
   WITHDRAWN: 'withdrawn',
 };
 
+const NOTIFICATION_TYPE = {
+  APPLICATION_SUBMITTED: 'application_submitted',
+  APPLICATION_RECEIVED: 'application_received',
+  APPLICATION_ACCEPTED: 'application_accepted',
+  APPLICATION_DECLINED: 'application_declined',
+  APPLICATION_WITHDRAWN: 'application_withdrawn',
+  PARTICIPANT_LEFT: 'participant_left',
+  ACTIVITY_UPDATED: 'activity_updated',
+  ACTIVITY_FULL: 'activity_full',
+  ACTIVITY_REMINDER: 'activity_reminder',
+};
+
 const GENDER_RESTRICTION = {
   NONE: 'none',
   MALE: 'male',
@@ -14,4 +26,4 @@ const GENDER_RESTRICTION = {
 // Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
 const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
 
-module.exports = { APPLICATION_STATUS, GENDER_RESTRICTION, TRANSPORT_METHODS };
+module.exports = { APPLICATION_STATUS, GENDER_RESTRICTION, TRANSPORT_METHODS, NOTIFICATION_TYPE };
