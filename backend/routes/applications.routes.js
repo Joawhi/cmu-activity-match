@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../db');
 const { handleServerError } = require('../utils/errors');
-const { APPLICATION_STATUS, NOTIFICATION_TYPE } = require('../constants');
+const { APPLICATION_STATUS, ACTIVITY_STATUS, NOTIFICATION_TYPE } = require('../constants');
 const { isActivityFull } = require('../utils/validators');
 const { insertNotification } = require('../utils/notifications');
 
@@ -28,6 +28,7 @@ router.put('/:id', async (req, res) => {
          activities.user_id AS activity_owner_id,
          activities.max_people,
          activities.title AS activity_title,
+         activities.status AS activity_status,
          COALESCE(NULLIF(users.display_name, ''), NULLIF(users.name, ''), 'Someone') AS applicant_name
        FROM applications
        JOIN activities ON applications.activity_id = activities.id
@@ -52,6 +53,10 @@ router.put('/:id', async (req, res) => {
     if (application.status === APPLICATION_STATUS.WITHDRAWN) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'This person withdrew their request' });
+    }
+    if (application.activity_status === ACTIVITY_STATUS.CANCELLED) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'This activity was cancelled' });
     }
 
     if (status === APPLICATION_STATUS.ACCEPTED && application.status !== APPLICATION_STATUS.ACCEPTED) {

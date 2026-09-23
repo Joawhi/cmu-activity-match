@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, ChevronDown, Clock, Hourglass, MapPin, MessageCircle, Pencil, Route, Timer, Trash2, Users, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronDown, Clock, Ban, Hourglass, MapPin, MessageCircle, Pencil, Route, Timer, Trash2, Users, Wallet } from 'lucide-react';
 import { formatEventDate, relativeTime, photoUrlFrom, formatMoney, perPersonBudget, transportLabel, isDeadlinePassed } from '../lib/helpers';
 import { cn } from '../lib/utils';
 import { useApp } from '../context/AppProvider';
@@ -10,8 +10,9 @@ import { JoinControl } from './JoinControl';
 import { RequestList } from './RequestList';
 
 export function ActivityCard({ activity, variant = 'discover', onEdit, showChat = false, highlighted = false }) {
-  const { deleteActivity, openProfile, openChat, getRequestsForActivity, loadRequests } = useApp();
+  const { cancelActivity, deleteActivity, openProfile, openChat, getRequestsForActivity, loadRequests } = useApp();
   const [showRequests, setShowRequests] = useState(false);
+  const cancelled = activity.status === 'cancelled';
 
   const { date, time } = formatEventDate(activity.date);
   const requests = getRequestsForActivity(activity.id);
@@ -50,6 +51,12 @@ export function ActivityCard({ activity, variant = 'discover', onEdit, showChat 
       <h3 className="mt-4 font-serif text-2xl leading-snug font-semibold tracking-tight text-balance">
         {activity.title}
       </h3>
+      {cancelled && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
+          <Ban className="size-3.5" strokeWidth={2} />
+          Cancelled
+        </p>
+      )}
       {activity.description && (
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">{activity.description}</p>
       )}
@@ -168,26 +175,44 @@ export function ActivityCard({ activity, variant = 'discover', onEdit, showChat 
                     Chat
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => onEdit?.(activity)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none active:translate-y-px"
-                >
-                  <Pencil className="size-3.5" strokeWidth={2} />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Delete this activity? This cannot be undone.')) {
-                      deleteActivity(activity.id);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 px-3.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/30 focus-visible:outline-none active:translate-y-px"
-                >
-                  <Trash2 className="size-3.5" strokeWidth={2} />
-                  Delete
-                </button>
+                {!cancelled && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit?.(activity)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none active:translate-y-px"
+                  >
+                    <Pencil className="size-3.5" strokeWidth={2} />
+                    Edit
+                  </button>
+                )}
+                {!cancelled && activity.acceptedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Cancel this activity? People who joined will be notified.')) {
+                        cancelActivity(activity.id);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 px-3.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/30 focus-visible:outline-none active:translate-y-px"
+                  >
+                    <Ban className="size-3.5" strokeWidth={2} />
+                    Cancel
+                  </button>
+                )}
+                {!cancelled && activity.acceptedCount === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Delete this activity? This cannot be undone.')) {
+                        deleteActivity(activity.id);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 px-3.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/30 focus-visible:outline-none active:translate-y-px"
+                  >
+                    <Trash2 className="size-3.5" strokeWidth={2} />
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
 

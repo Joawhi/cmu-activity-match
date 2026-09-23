@@ -35,6 +35,7 @@ export function DiscoverFeed({ onCreate, focusActivityId = null }) {
 
     return activities
       .filter((a) => a.hostId !== currentUser.id)
+      .filter((a) => a.status !== 'cancelled')
       .filter((a) => {
         if (categories.size && !categories.has(a.category)) return false;
         if (who !== 'any' && a.whoCanJoin !== 'none' && a.whoCanJoin !== who) return false;

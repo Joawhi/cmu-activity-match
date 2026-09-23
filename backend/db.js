@@ -54,7 +54,8 @@ async function setupTables() {
       ADD COLUMN IF NOT EXISTS transport_note TEXT,
       ADD COLUMN IF NOT EXISTS duration_hours NUMERIC(4,1),
       ADD COLUMN IF NOT EXISTS application_deadline TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS participation_requirements TEXT
+      ADD COLUMN IF NOT EXISTS participation_requirements TEXT,
+      ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
   `);
 
   await pool.query(`
@@ -66,6 +67,13 @@ async function setupTables() {
       status TEXT DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT NOW()
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE applications
+      DROP CONSTRAINT IF EXISTS applications_activity_id_fkey,
+      ADD CONSTRAINT applications_activity_id_fkey
+      FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE
   `);
 
   await pool.query(`

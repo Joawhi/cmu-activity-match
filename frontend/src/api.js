@@ -41,6 +41,9 @@ export const api = {
   deleteActivity: (id, userId) =>
     request(`/activities/${id}?user_id=${userId}`, { method: 'DELETE' }),
 
+  cancelActivity: (id, userId) =>
+    request(`/activities/${id}?user_id=${userId}`, { method: 'DELETE' }),
+
   applyToActivity: (id, userId, note) =>
     request(`/activities/${id}/apply`, { method: 'POST', body: JSON.stringify({ user_id: userId, note }) }),
 

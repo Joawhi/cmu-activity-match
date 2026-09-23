@@ -22,7 +22,7 @@ async function displayName(db, userId) {
 
 // People with a live application (pending or accepted), except the person
 // who caused the change.
-async function notifyApplicants(db, { activityId, excludeUserId, statuses, type, title, body }) {
+async function notifyApplicants(db, { activityId, excludeUserId, statuses, type, title, body, keepActivityLink = true }) {
   await db.query(
     `INSERT INTO notifications (user_id, type, title, body, activity_id)
      SELECT DISTINCT applications.user_id, $2, $3, $4, $5::int
@@ -31,7 +31,7 @@ async function notifyApplicants(db, { activityId, excludeUserId, statuses, type,
        AND applications.status = ANY($6::text[])
        AND applications.user_id IS NOT NULL
        AND ($7::int IS NULL OR applications.user_id IS DISTINCT FROM $7::int)`,
-    [activityId, type, title, body || '', activityId, statuses, excludeUserId ?? null]
+    [activityId, type, title, body || '', keepActivityLink ? activityId : null, statuses, excludeUserId ?? null]
   );
 }
 
@@ -51,8 +51,9 @@ async function ensureUpcomingReminders(db, userId) {
        ON applications.activity_id = activities.id
       AND applications.user_id = $1
       AND applications.status = 'accepted'
-     WHERE activities.user_id = $1
-        OR applications.user_id = $1`,
+     WHERE (activities.user_id = $1
+        OR applications.user_id = $1)
+       AND activities.status IS DISTINCT FROM 'cancelled'`,
     [userId]
   );
 

@@ -25,6 +25,7 @@ function mapActivity(raw) {
     durationHours: raw.duration_hours == null ? null : Number(raw.duration_hours),
     applicationDeadline: raw.application_deadline || null,
     requirements: raw.participation_requirements || '',
+    status: raw.status || 'active',
     myApplicationStatus: raw.my_application_status,
     applicationCount: raw.application_count || 0,
     acceptedCount: raw.accepted_count || 0,
@@ -67,10 +68,12 @@ export function ActivitiesProvider({ children }) {
     await fetchActivities();
   };
 
-  const deleteActivity = async (id) => {
-    await api.deleteActivity(id, currentUser.id);
+  const cancelActivity = async (id) => {
+    await api.cancelActivity(id, currentUser.id);
     await fetchActivities();
   };
+
+  const deleteActivity = cancelActivity;
 
   const sendJoinRequest = async (activityId, note) => {
     await api.applyToActivity(activityId, currentUser.id, note);
@@ -103,6 +106,7 @@ export function ActivitiesProvider({ children }) {
     loading,
     createActivity,
     updateActivity,
+    cancelActivity,
     deleteActivity,
     sendJoinRequest,
     withdrawJoinRequest,

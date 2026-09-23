@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../db');
 const { handleServerError } = require('../utils/errors');
-const { GENDER_RESTRICTION, APPLICATION_STATUS, NOTIFICATION_TYPE } = require('../constants');
+const { GENDER_RESTRICTION, APPLICATION_STATUS, ACTIVITY_STATUS, NOTIFICATION_TYPE } = require('../constants');
 const { insertNotification, displayName, notifyApplicants } = require('../utils/notifications');
 const {
   parseRequiredText,
@@ -213,6 +213,9 @@ router.put('/:id', async (req, res) => {
     if (existing.rows[0].user_id !== user_id) {
       return res.status(403).json({ error: 'You can only edit your own activities' });
     }
+    if (existing.rows[0].status === ACTIVITY_STATUS.CANCELLED) {
+      return res.status(400).json({ error: 'This activity was cancelled' });
+    }
 
     client = await pool.connect();
     await client.query('BEGIN');
@@ -251,6 +254,7 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  let client;
   try {
     const { id } = req.params;
     const userId = Number(req.query.user_id);
@@ -260,13 +264,60 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Activity not found' });
     }
     if (existing.rows[0].user_id !== userId) {
-      return res.status(403).json({ error: 'You can only delete your own activities' });
+      return res.status(403).json({ error: 'You can only remove your own activities' });
+    }
+    if (existing.rows[0].status === ACTIVITY_STATUS.CANCELLED) {
+      return res.status(400).json({ error: 'This activity is already cancelled' });
     }
 
-    await pool.query('DELETE FROM activities WHERE id = $1', [id]);
-    res.json({ success: true });
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const accepted = await client.query(
+      `SELECT COUNT(*)::int AS accepted_count
+       FROM applications
+       WHERE activity_id = $1 AND status = 'accepted'`,
+      [id]
+    );
+
+    if (accepted.rows[0].accepted_count > 0) {
+      await client.query(
+        `UPDATE activities SET status = $1 WHERE id = $2`,
+        [ACTIVITY_STATUS.CANCELLED, id]
+      );
+      await notifyApplicants(client, {
+        activityId: id,
+        excludeUserId: userId,
+        statuses: [APPLICATION_STATUS.ACCEPTED, APPLICATION_STATUS.PENDING],
+        type: NOTIFICATION_TYPE.ACTIVITY_CANCELLED,
+        title: 'Activity cancelled',
+        body: `${existing.rows[0].title} was cancelled.`,
+      });
+      await client.query('COMMIT');
+      res.json({ success: true, status: ACTIVITY_STATUS.CANCELLED });
+      return;
+    }
+
+    await notifyApplicants(client, {
+      activityId: id,
+      excludeUserId: userId,
+      statuses: [APPLICATION_STATUS.PENDING],
+      type: NOTIFICATION_TYPE.ACTIVITY_DELETED,
+      title: 'Activity deleted',
+      body: `${existing.rows[0].title} was deleted.`,
+      keepActivityLink: false,
+    });
+    await client.query('DELETE FROM applications WHERE activity_id = $1', [id]);
+    await client.query('DELETE FROM activities WHERE id = $1', [id]);
+    await client.query('COMMIT');
+    res.json({ success: true, status: 'deleted' });
   } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK').catch(() => { });
+    }
     handleServerError(err, res);
+  } finally {
+    client?.release();
   }
 });
 
@@ -298,6 +349,9 @@ router.post('/:id/apply', async (req, res) => {
     }
     if (activityResult.rows[0].user_id === user_id) {
       return res.status(400).json({ error: "You can't apply to your own activity" });
+    }
+    if (activityResult.rows[0].status === ACTIVITY_STATUS.CANCELLED) {
+      return res.status(400).json({ error: 'This activity was cancelled' });
     }
 
     // node-postgres parses TIMESTAMPTZ into a Date, so both sides here are

@@ -32,6 +32,14 @@ export function JoinControl({ activity }) {
   const isFull = isActivityFull(activity);
   const deadlinePassed = isDeadlinePassed(activity.applicationDeadline);
 
+  if (activity.status === 'cancelled') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive">
+        Cancelled
+      </span>
+    );
+  }
+
   if (activity.myApplicationStatus === 'accepted') {
     return (
       <div className="flex flex-col items-end gap-1">
