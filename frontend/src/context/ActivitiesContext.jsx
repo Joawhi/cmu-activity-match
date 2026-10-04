@@ -39,16 +39,23 @@ export function ActivitiesProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [requestsByActivity, setRequestsByActivity] = useState({});
 
+  const refreshActivities = useCallback(async () => {
+    if (!currentUser) return [];
+    const raw = await api.getActivities(currentUser.id);
+    const mapped = raw.map(mapActivity);
+    setActivities(mapped);
+    return mapped;
+  }, [currentUser]);
+
   const fetchActivities = useCallback(async () => {
     if (!currentUser) return;
     setLoading(true);
     try {
-      const raw = await api.getActivities(currentUser.id);
-      setActivities(raw.map(mapActivity));
+      await refreshActivities();
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, refreshActivities]);
 
   useEffect(() => {
     if (currentUser) {
@@ -57,6 +64,19 @@ export function ActivitiesProvider({ children }) {
       setActivities([]);
     }
   }, [currentUser, fetchActivities]);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const refresh = () => {
+      refreshActivities().catch(() => {});
+    };
+    const intervalId = window.setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [currentUser, refreshActivities]);
 
   const createActivity = async (input) => {
     await api.createActivity({ ...input, user_id: currentUser.id });
@@ -104,6 +124,7 @@ export function ActivitiesProvider({ children }) {
   const value = {
     activities,
     loading,
+    refreshActivities,
     createActivity,
     updateActivity,
     cancelActivity,

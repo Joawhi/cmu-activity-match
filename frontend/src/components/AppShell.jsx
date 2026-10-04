@@ -13,7 +13,7 @@ import { Chats } from './Chats';
 import { NotificationCenter } from './NotificationCenter';
 
 export function AppShell() {
-  const { currentUser, openProfile, logout, activeChatActivityId, closeChat, activities } = useApp();
+  const { currentUser, openProfile, logout, activeChatActivityId, closeChat, activities, refreshActivities } = useApp();
   const [view, setView] = useState('discover');
   const [editing, setEditing] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -50,9 +50,15 @@ export function AppShell() {
     setView(nextView);
   };
 
-  const openRelatedActivity = (activityId) => {
-    const activity = activities.find((item) => item.id === activityId);
+  const openRelatedActivity = async (activityId) => {
     closeChat();
+    let list = activities;
+    try {
+      list = await refreshActivities();
+    } catch {
+      // The click still opens the activity with the list already on screen.
+    }
+    const activity = list.find((item) => item.id === activityId);
     if (!activity) {
       setActivityFocus({ id: activityId, section: null });
       setView('discover');

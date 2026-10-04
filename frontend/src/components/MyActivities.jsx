@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppProvider';
 import { ActivityCard } from './ActivityCard';
 import { EmptyState } from './EmptyState';
@@ -6,6 +6,21 @@ import { EmptyState } from './EmptyState';
 export function MyActivities({ onCreate, onEdit, focusActivityId = null, focusSection = null }) {
   const { activities, currentUser } = useApp();
   const [activeSection, setActiveSection] = useState('created');
+  const previousStatuses = useRef(new Map());
+
+  const statuses = new Map();
+  let becameAccepted = false;
+  for (const activity of activities) {
+    if (activity.hostId === currentUser.id || !activity.myApplicationStatus) continue;
+    if (previousStatuses.current.get(activity.id) === 'pending' && activity.myApplicationStatus === 'accepted') {
+      becameAccepted = true;
+    }
+    statuses.set(activity.id, activity.myApplicationStatus);
+  }
+  previousStatuses.current = statuses;
+  if (becameAccepted && activeSection === 'pending') {
+    setActiveSection('joined');
+  }
 
   useEffect(() => {
     if (focusSection) setActiveSection(focusSection);
