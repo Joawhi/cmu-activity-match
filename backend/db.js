@@ -22,6 +22,11 @@ async function setupTables() {
   `);
 
   await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS password_hash TEXT
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS activities (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,

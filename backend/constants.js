@@ -33,10 +33,19 @@ const GENDER_RESTRICTION = {
 // Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
 const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
 
+// Must stay in sync with SCHOOL_YEARS and LANGUAGES in frontend/src/constants.js.
+const SCHOOL_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', "Master's", 'PhD', 'Other'];
+const LANGUAGES = [
+  'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
+  'Portuguese', 'Korean', 'Japanese', 'German', 'Other',
+];
+
 module.exports = {
   APPLICATION_STATUS,
   ACTIVITY_STATUS,
   GENDER_RESTRICTION,
   TRANSPORT_METHODS,
+  SCHOOL_YEARS,
+  LANGUAGES,
   NOTIFICATION_TYPE,
 };

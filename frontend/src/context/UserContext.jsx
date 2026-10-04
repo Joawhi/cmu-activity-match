@@ -15,10 +15,17 @@ export function UserProvider({ children }) {
     setCheckedStorage(true);
   }, []);
 
-  const login = async (name, email) => {
-    const user = await api.login(name, email);
+  const persistUser = (user) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     setCurrentUser(user);
+  };
+
+  const login = async (email, password) => {
+    persistUser(await api.login(email, password));
+  };
+
+  const register = async (payload) => {
+    persistUser(await api.register(payload));
   };
 
   const logout = () => {
@@ -36,7 +43,7 @@ export function UserProvider({ children }) {
     setCurrentUser(refreshed);
   };
 
-  const value = { currentUser, checkedStorage, login, logout, updateProfile };
+  const value = { currentUser, checkedStorage, login, register, logout, updateProfile };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
