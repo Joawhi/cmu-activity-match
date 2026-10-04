@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { useApp } from '../context/AppProvider';
 import { SCHOOL_YEARS, LANGUAGES, LANGUAGE_FLAGS, SECURITY_QUESTIONS } from '../constants';
@@ -27,9 +27,16 @@ export function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [emailSuggestionDismissed, setEmailSuggestionDismissed] = useState(false);
+  const emailInputRef = useRef(null);
+  const pendingEmailSelection = useRef(null);
 
-  const emailSuggestion = emailSuggestionDismissed ? '' : cmuEmailSuggestion(email);
+  useLayoutEffect(() => {
+    const range = pendingEmailSelection.current;
+    const input = emailInputRef.current;
+    if (!range || !input) return;
+    input.setSelectionRange(range.start, range.end);
+    pendingEmailSelection.current = null;
+  });
 
   const emailError = validateEmail(email);
   const passwordError = validatePassword(password);
@@ -165,47 +172,44 @@ export function LoginScreen() {
 
             <Field label="CMU email" htmlFor="cmu-email" error={show(email, emailError)}>
               <input
+                ref={emailInputRef}
                 id="cmu-email"
                 type="text"
                 inputMode="email"
                 value={email}
                 onChange={(event) => {
-                  setEmail(event.target.value);
-                  setEmailSuggestionDismissed(false);
+                  const next = event.target.value;
+                  const suggestion = cmuEmailSuggestion(next);
+                  const replacedSuggestion = email.length - next.length > 1
+                    && email.startsWith(next.slice(0, Math.max(0, next.length - 1)));
                   setResetQuestion('');
-                }}
-                onKeyDown={(event) => {
-                  if (!emailSuggestion) return;
-                  if (event.key === 'Escape') {
-                    setEmailSuggestionDismissed(true);
+                  if (suggestion && (next.length > email.length || replacedSuggestion)) {
+                    pendingEmailSelection.current = { start: next.length, end: suggestion.length };
+                    setEmail(suggestion);
                     return;
                   }
-                  if (event.key === 'Tab' || event.key === 'Enter' || event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    setEmail(emailSuggestion);
-                    setEmailSuggestionDismissed(false);
-                  }
+                  pendingEmailSelection.current = null;
+                  setEmail(next);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape' && event.key !== 'Backspace') return;
+                  const input = event.currentTarget;
+                  const start = input.selectionStart ?? 0;
+                  const end = input.selectionEnd ?? 0;
+                  if (end !== email.length || start >= end) return;
+                  const typed = email.slice(0, start);
+                  if (cmuEmailSuggestion(typed) !== email) return;
+                  event.preventDefault();
+                  pendingEmailSelection.current = { start: typed.length, end: typed.length };
+                  setEmail(typed);
                 }}
                 placeholder="you@andrew.cmu.edu"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                aria-autocomplete="list"
-                aria-expanded={Boolean(emailSuggestion)}
-                aria-controls="cmu-email-suggestion"
+                aria-autocomplete="inline"
                 className={inputClass}
               />
-              {emailSuggestion ? (
-                <button
-                  id="cmu-email-suggestion"
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setEmail(emailSuggestion)}
-                  className="mt-1.5 w-full rounded-xl border border-border bg-background px-4 py-2 text-left text-sm text-foreground hover:border-foreground"
-                >
-                  {emailSuggestion}
-                </button>
-              ) : null}
             </Field>
 
             {mode === 'reset' && resetQuestion && (
