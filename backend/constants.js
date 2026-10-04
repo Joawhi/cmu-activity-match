@@ -33,11 +33,19 @@ const GENDER_RESTRICTION = {
 // Must stay in sync with TRANSPORT_OPTIONS in frontend/src/constants.js.
 const TRANSPORT_METHODS = ['walk', 'transit', 'drive', 'rideshare', 'bike'];
 
-// Must stay in sync with SCHOOL_YEARS and LANGUAGES in frontend/src/constants.js.
+// Must stay in sync with SCHOOL_YEARS, LANGUAGES, and SECURITY_QUESTIONS
+// in frontend/src/constants.js.
 const SCHOOL_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', "Master's", 'PhD', 'Other'];
 const LANGUAGES = [
   'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
   'Portuguese', 'Korean', 'Japanese', 'German', 'Other',
+];
+const SECURITY_QUESTIONS = [
+  'What was the name of your first pet?',
+  'What city were you born in?',
+  'What is your favorite movie?',
+  'What was the name of your elementary school?',
+  'What is your favorite food?',
 ];
 
 module.exports = {
@@ -47,5 +55,6 @@ module.exports = {
   TRANSPORT_METHODS,
   SCHOOL_YEARS,
   LANGUAGES,
+  SECURITY_QUESTIONS,
   NOTIFICATION_TYPE,
 };

@@ -28,6 +28,14 @@ export function validateEmail(raw) {
   return '';
 }
 
+export function validateSecurityAnswer(raw) {
+  const answer = raw.trim().replace(/\s+/g, ' ');
+  if (!answer) return 'Security answer is required';
+  if (answer.length < 2) return 'Security answer must be at least 2 characters';
+  if (answer.length > 80) return 'Security answer must be 80 characters or fewer';
+  return '';
+}
+
 export function validatePassword(raw) {
   if (!raw) return 'Password is required';
   if (raw.length < 8) return 'Password must be at least 8 characters';

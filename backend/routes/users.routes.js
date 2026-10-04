@@ -8,6 +8,8 @@ const {
   parseAccountName,
   parseAccountEmail,
   parseAccountPassword,
+  parseSecurityQuestion,
+  parseSecurityAnswer,
   parseSchoolYear,
   parseLanguages,
   publicUser,
@@ -33,6 +35,12 @@ router.post('/register', loginLimiter, async (req, res) => {
     const password = parseAccountPassword(req.body.password);
     if (!password.ok) return res.status(400).json({ error: password.error });
 
+    const securityQuestion = parseSecurityQuestion(req.body.security_question);
+    if (!securityQuestion.ok) return res.status(400).json({ error: securityQuestion.error });
+
+    const securityAnswer = parseSecurityAnswer(req.body.security_answer);
+    if (!securityAnswer.ok) return res.status(400).json({ error: securityAnswer.error });
+
     const displayName = parseOptionalText(req.body.display_name, 'displayName');
     if (!displayName.ok) return res.status(400).json({ error: displayName.error });
 
@@ -49,6 +57,7 @@ router.post('/register', loginLimiter, async (req, res) => {
     if (!languages.ok) return res.status(400).json({ error: languages.error });
 
     const passwordHash = await bcrypt.hash(password.value, 10);
+    const answerHash = await bcrypt.hash(securityAnswer.value, 10);
     const existing = await pool.query(
       'SELECT * FROM users WHERE lower(email) = $1',
       [email.value]
@@ -64,17 +73,21 @@ router.post('/register', loginLimiter, async (req, res) => {
          SET name = $1,
              email = $2,
              password_hash = $3,
-             display_name = COALESCE($4, display_name),
-             bio = COALESCE($5, bio),
-             school_year = COALESCE($6, school_year),
-             major = COALESCE($7, major),
-             languages = COALESCE($8, languages)
-         WHERE id = $9
+             security_question = $4,
+             security_answer_hash = $5,
+             display_name = COALESCE($6, display_name),
+             bio = COALESCE($7, bio),
+             school_year = COALESCE($8, school_year),
+             major = COALESCE($9, major),
+             languages = COALESCE($10, languages)
+         WHERE id = $11
          RETURNING *`,
         [
           name.value,
           email.value,
           passwordHash,
+          securityQuestion.value,
+          answerHash,
           displayName.value,
           bio.value,
           schoolYear.value,
@@ -87,13 +100,15 @@ router.post('/register', loginLimiter, async (req, res) => {
     }
 
     const created = await pool.query(
-      `INSERT INTO users (name, email, password_hash, display_name, bio, school_year, major, languages)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO users (name, email, password_hash, security_question, security_answer_hash, display_name, bio, school_year, major, languages)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         name.value,
         email.value,
         passwordHash,
+        securityQuestion.value,
+        answerHash,
         displayName.value,
         bio.value,
         schoolYear.value,
@@ -133,6 +148,60 @@ router.post('/login', loginLimiter, async (req, res) => {
     }
 
     res.json(publicUser(user));
+  } catch (err) {
+    handleServerError(err, res);
+  }
+});
+
+router.post('/password/question', loginLimiter, async (req, res) => {
+  try {
+    const email = parseAccountEmail(req.body.email);
+    if (!email.ok) return res.status(400).json({ error: email.error });
+
+    const existing = await pool.query(
+      'SELECT security_question FROM users WHERE lower(email) = $1',
+      [email.value]
+    );
+    const question = existing.rows[0]?.security_question;
+    if (!question) {
+      return res.status(404).json({ error: 'No security question is set for that email' });
+    }
+
+    res.json({ question });
+  } catch (err) {
+    handleServerError(err, res);
+  }
+});
+
+router.post('/password/reset', loginLimiter, async (req, res) => {
+  try {
+    const email = parseAccountEmail(req.body.email);
+    if (!email.ok) return res.status(400).json({ error: email.error });
+
+    const password = parseAccountPassword(req.body.password);
+    if (!password.ok) return res.status(400).json({ error: password.error });
+
+    const answer = parseSecurityAnswer(req.body.answer);
+    if (!answer.ok) return res.status(400).json({ error: answer.error });
+
+    const existing = await pool.query(
+      'SELECT id, security_answer_hash FROM users WHERE lower(email) = $1',
+      [email.value]
+    );
+    const user = existing.rows[0];
+    const matches = user?.security_answer_hash
+      ? await bcrypt.compare(answer.value, user.security_answer_hash)
+      : false;
+    if (!matches) {
+      return res.status(401).json({ error: 'That answer does not match' });
+    }
+
+    const passwordHash = await bcrypt.hash(password.value, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, user.id]
+    );
+    res.json({ success: true });
   } catch (err) {
     handleServerError(err, res);
   }

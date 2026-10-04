@@ -1,4 +1,4 @@
-const { TRANSPORT_METHODS, SCHOOL_YEARS, LANGUAGES } = require('../constants');
+const { TRANSPORT_METHODS, SCHOOL_YEARS, LANGUAGES, SECURITY_QUESTIONS } = require('../constants');
 
 const MAX_LENGTHS = {
   title: 120,
@@ -131,6 +131,24 @@ function parseAccountPassword(raw) {
   return { ok: true, value: raw };
 }
 
+function parseSecurityQuestion(raw) {
+  if (typeof raw !== 'string' || !SECURITY_QUESTIONS.includes(raw)) {
+    return { ok: false, error: 'Choose a security question' };
+  }
+  return { ok: true, value: raw };
+}
+
+function parseSecurityAnswer(raw) {
+  if (typeof raw !== 'string') {
+    return { ok: false, error: 'Security answer is required' };
+  }
+  const value = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!value) return { ok: false, error: 'Security answer is required' };
+  if (value.length < 2) return { ok: false, error: 'Security answer must be at least 2 characters' };
+  if (value.length > 80) return { ok: false, error: 'Security answer must be 80 characters or fewer' };
+  return { ok: true, value };
+}
+
 function parseSchoolYear(raw) {
   if (raw === undefined || raw === null || raw === '') return { ok: true, value: null };
   if (typeof raw !== 'string' || !SCHOOL_YEARS.includes(raw)) {
@@ -153,6 +171,8 @@ function publicUser(row) {
   if (!row) return null;
   const user = { ...row };
   delete user.password_hash;
+  delete user.security_question;
+  delete user.security_answer_hash;
   return user;
 }
 
@@ -166,6 +186,8 @@ module.exports = {
   parseAccountName,
   parseAccountEmail,
   parseAccountPassword,
+  parseSecurityQuestion,
+  parseSecurityAnswer,
   parseSchoolYear,
   parseLanguages,
   publicUser,

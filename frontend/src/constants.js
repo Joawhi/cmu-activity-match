@@ -20,6 +20,14 @@ export const TRANSPORT_OPTIONS = [
 
 export const SCHOOL_YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior', "Master's", 'PhD', 'Other'];
 
+export const SECURITY_QUESTIONS = [
+  'What was the name of your first pet?',
+  'What city were you born in?',
+  'What is your favorite movie?',
+  'What was the name of your elementary school?',
+  'What is your favorite food?',
+];
+
 export const LANGUAGES = [
   'English', 'Spanish', 'Mandarin', 'Hindi', 'French',
   'Portuguese', 'Korean', 'Japanese', 'German', 'Other',

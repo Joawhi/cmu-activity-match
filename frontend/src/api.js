@@ -20,6 +20,15 @@ export const api = {
   register: (payload) =>
     request('/users/register', { method: 'POST', body: JSON.stringify(payload) }),
 
+  securityQuestion: (email) =>
+    request('/users/password/question', { method: 'POST', body: JSON.stringify({ email }) }),
+
+  resetPassword: (email, answer, password) =>
+    request('/users/password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ email, answer, password }),
+    }),
+
   getUser: (id) => request(`/users/${id}`),
 
   updateProfile: (id, fields) =>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { api } from '../api';
 import { useApp } from '../context/AppProvider';
-import { SCHOOL_YEARS, LANGUAGES, LANGUAGE_FLAGS } from '../constants';
-import { cmuEmailSuggestion, validateEmail, validateName, validatePassword } from '../lib/account';
+import { SCHOOL_YEARS, LANGUAGES, LANGUAGE_FLAGS, SECURITY_QUESTIONS } from '../constants';
+import { cmuEmailSuggestion, validateEmail, validateName, validatePassword, validateSecurityAnswer } from '../lib/account';
 import { cn } from '../lib/utils';
 
 const inputClass =
@@ -15,6 +16,10 @@ export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
+  const [resetQuestion, setResetQuestion] = useState('');
+  const [notice, setNotice] = useState('');
   const [bio, setBio] = useState('');
   const [schoolYear, setSchoolYear] = useState('');
   const [major, setMajor] = useState('');
@@ -32,16 +37,22 @@ export function LoginScreen() {
   const confirmError = confirmPassword
     ? (confirmPassword === password ? '' : 'Passwords do not match')
     : 'Confirm your password';
+  const questionError = SECURITY_QUESTIONS.includes(securityQuestion) ? '' : 'Choose a security question';
+  const answerError = validateSecurityAnswer(securityAnswer);
 
   const show = (value, message) => (submitted || value ? message : '');
 
   const canLogin = !emailError && !passwordError;
-  const canRegister = canLogin && !nameError && !confirmError;
+  const canRegister = canLogin && !nameError && !confirmError && !questionError && !answerError;
+  const canReset = !emailError && !answerError && !passwordError && !confirmError;
+  const needsConfirm = mode === 'register' || (mode === 'reset' && resetQuestion);
 
   const switchMode = (next) => {
     setMode(next);
     setError('');
+    setNotice('');
     setSubmitted(false);
+    setResetQuestion('');
   };
 
   const toggleLanguage = (language) => {
@@ -55,24 +66,44 @@ export function LoginScreen() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitted(true);
-    if (mode === 'login' ? !canLogin : !canRegister) return;
+    setNotice('');
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (mode === 'login' && !canLogin) return;
+    if (mode === 'register' && !canRegister) return;
+    if (mode === 'reset' && (resetQuestion ? !canReset : emailError)) return;
 
     setLoading(true);
     setError('');
     try {
       if (mode === 'login') {
-        await login(email.trim().toLowerCase(), password);
-      } else {
+        await login(normalizedEmail, password);
+      } else if (mode === 'register') {
         await register({
           name: name.trim(),
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           password,
+          security_question: securityQuestion,
+          security_answer: securityAnswer,
           display_name: displayName.trim(),
           bio: bio.trim(),
           school_year: schoolYear,
           major: major.trim(),
           languages: languages.join(','),
         });
+      } else if (!resetQuestion) {
+        const result = await api.securityQuestion(normalizedEmail);
+        setResetQuestion(result.question);
+        setSubmitted(false);
+      } else {
+        await api.resetPassword(normalizedEmail, securityAnswer, password);
+        setPassword('');
+        setConfirmPassword('');
+        setSecurityAnswer('');
+        setResetQuestion('');
+        setSubmitted(false);
+        setMode('login');
+        setNotice('Password updated. Log in with your new password.');
       }
     } catch (err) {
       setError(err.message);
@@ -92,13 +123,20 @@ export function LoginScreen() {
 
         <div className="rounded-2xl border border-border bg-card p-7 sm:p-9">
           <h1 className="text-center text-3xl font-bold tracking-tight text-balance app-heading">
-            {mode === 'login' ? 'Log in' : 'Create an account'}
+            {mode === 'login' ? 'Log in' : mode === 'register' ? 'Create an account' : 'Reset your password'}
           </h1>
           <p className="mx-auto mt-2.5 max-w-sm text-center text-sm leading-relaxed text-muted-foreground">
             {mode === 'login'
               ? 'Use your CMU email and password.'
-              : 'Your name, email, and password are required. The rest of your profile can wait.'}
+              : mode === 'register'
+                ? 'Your name, email, password, and security question are required. The rest of your profile can wait.'
+                : resetQuestion
+                  ? 'Answer the question you chose when you registered.'
+                  : 'Enter the CMU email on your account.'}
           </p>
+          {notice && (
+            <p className="mt-4 text-center text-sm text-foreground" role="status">{notice}</p>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-4">
             {mode === 'register' && (
@@ -134,6 +172,7 @@ export function LoginScreen() {
                 onChange={(event) => {
                   setEmail(event.target.value);
                   setEmailSuggestionDismissed(false);
+                  setResetQuestion('');
                 }}
                 onKeyDown={(event) => {
                   if (!emailSuggestion) return;
@@ -169,23 +208,48 @@ export function LoginScreen() {
               ) : null}
             </Field>
 
-            <Field
-              label="Password"
-              htmlFor="password"
-              error={show(password, passwordError)}
-              hint={mode === 'register' && !show(password, passwordError) ? 'At least 8 characters, with a letter and a number.' : ''}
-            >
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                className={inputClass}
-              />
-            </Field>
+            {mode === 'reset' && resetQuestion && (
+              <>
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-foreground">Security question</p>
+                  <p className="rounded-xl bg-muted px-4 py-3 text-sm text-foreground">{resetQuestion}</p>
+                </div>
+                <Field
+                  label="Security answer"
+                  htmlFor="reset-answer"
+                  error={show(securityAnswer, answerError)}
+                  hint={show(securityAnswer, answerError) ? '' : 'Answers are not case-sensitive.'}
+                >
+                  <input
+                    id="reset-answer"
+                    value={securityAnswer}
+                    onChange={(event) => setSecurityAnswer(event.target.value)}
+                    autoComplete="off"
+                    className={inputClass}
+                  />
+                </Field>
+              </>
+            )}
 
-            {mode === 'register' && (
+            {(mode !== 'reset' || resetQuestion) && (
+              <Field
+                label={mode === 'reset' ? 'New password' : 'Password'}
+                htmlFor="password"
+                error={show(password, passwordError)}
+                hint={mode !== 'login' && !show(password, passwordError) ? 'At least 8 characters, with a letter and a number.' : ''}
+              >
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className={inputClass}
+                />
+              </Field>
+            )}
+
+            {needsConfirm && (
               <>
                 <Field label="Confirm password" htmlFor="confirm-password" error={submitted || confirmPassword ? confirmError : ''}>
                   <input
@@ -194,6 +258,39 @@ export function LoginScreen() {
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
                     autoComplete="new-password"
+                    className={inputClass}
+                  />
+                </Field>
+              </>
+            )}
+
+            {mode === 'register' && (
+              <>
+                <Field label="Security question" htmlFor="security-question" error={show(securityQuestion, questionError)}>
+                  <select
+                    id="security-question"
+                    value={securityQuestion}
+                    onChange={(event) => setSecurityQuestion(event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select a question</option>
+                    {SECURITY_QUESTIONS.map((question) => (
+                      <option key={question} value={question}>{question}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field
+                  label="Security answer"
+                  htmlFor="security-answer"
+                  error={show(securityAnswer, answerError)}
+                  hint={show(securityAnswer, answerError) ? '' : 'You will need this if you forget your password. It is not case-sensitive.'}
+                >
+                  <input
+                    id="security-answer"
+                    value={securityAnswer}
+                    onChange={(event) => setSecurityAnswer(event.target.value)}
+                    autoComplete="off"
                     className={inputClass}
                   />
                 </Field>
@@ -264,15 +361,35 @@ export function LoginScreen() {
 
             <button
               type="submit"
-              disabled={loading || (submitted && (mode === 'login' ? !canLogin : !canRegister))}
+              disabled={loading || (submitted && (
+                mode === 'login' ? !canLogin : mode === 'register' ? !canRegister : resetQuestion ? !canReset : Boolean(emailError)
+              ))}
               className="mt-2 inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-cmu-dark focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+              {loading
+                ? 'Please wait…'
+                : mode === 'login'
+                  ? 'Log in'
+                  : mode === 'register'
+                    ? 'Create account'
+                    : resetQuestion
+                      ? 'Save new password'
+                      : 'Continue'}
             </button>
+
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => switchMode('reset')}
+                className="text-center text-sm font-bold text-primary hover:underline"
+              >
+                Forgot password?
+              </button>
+            )}
           </form>
 
-          <p className="mt-5 text-center text-sm text-muted-foreground">
-            {mode === 'login' ? 'New here?' : 'Already registered?'}{' '}
+          <p className="mt-10 border-t border-border pt-6 text-center text-sm text-muted-foreground">
+            {mode === 'login' ? 'New here?' : mode === 'register' ? 'Already registered?' : 'Remembered it?'}{' '}
             <button
               type="button"
               onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
