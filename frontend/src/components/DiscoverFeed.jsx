@@ -28,6 +28,15 @@ export function DiscoverFeed({ onCreate, focusActivityId = null }) {
       return next;
     });
 
+  const clearFilters = () => {
+    setQuery('');
+    setCategories(new Set());
+    setDateFilter('any');
+    setWho('any');
+  };
+
+  const filtersActive = query.trim() || categories.size > 0 || dateFilter !== 'any' || who !== 'any';
+
   const filtered = useMemo(() => {
     const now = new Date();
     const weekAhead = new Date();
@@ -69,54 +78,56 @@ export function DiscoverFeed({ onCreate, focusActivityId = null }) {
   }, [focusActivityId, loading, visible]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:py-8">
-      <header className="mb-6">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl app-heading">
-          Discover activities
-        </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Find people to spend your evening with — no strangers stay strangers for long.
-        </p>
-      </header>
+    <div>
+      <div className="sticky top-16 z-30 border-b border-border bg-card px-4 pt-6 pb-4 shadow-sm">
+        <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
+          <div className="group relative mb-5 w-full max-w-3xl">
+            <Search className="pointer-events-none absolute top-1/2 left-5 size-5 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" strokeWidth={2} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search activities..."
+              className="w-full rounded-full border border-border bg-card py-3 pr-6 pl-12 text-base shadow-sm transition hover:shadow-md focus-visible:border-primary focus-visible:shadow-md focus-visible:outline-none"
+            />
+          </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={2} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search dinners, museums, game nights…"
-          className="w-full rounded-full border border-border bg-card py-3 pr-4 pl-11 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-        />
+          <div className="no-scrollbar flex w-full snap-x gap-2 overflow-x-auto px-1 pb-2 sm:justify-center sm:gap-3">
+            {CATEGORIES.map((cat) => {
+              const meta = CATEGORY_META[cat];
+              return (
+                <FilterChip
+                  key={cat}
+                  label={cat}
+                  icon={meta.icon}
+                  active={categories.has(cat)}
+                  onClick={() => toggleCategory(cat)}
+                />
+              );
+            })}
+          </div>
+
+          <div className="no-scrollbar mt-2 flex w-full items-center gap-2 overflow-x-auto px-1 pb-1 sm:justify-center">
+            <FilterChip label="Any day" active={dateFilter === 'any'} onClick={() => setDateFilter('any')} />
+            <FilterChip label="Today" active={dateFilter === 'today'} onClick={() => setDateFilter('today')} />
+            <FilterChip label="This week" active={dateFilter === 'week'} onClick={() => setDateFilter('week')} />
+            <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            {WHO_OPTIONS.map((opt) => (
+              <FilterChip key={opt.id} label={opt.label} active={who === opt.id} onClick={() => setWho(opt.id)} />
+            ))}
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="ml-1 shrink-0 text-xs font-bold text-primary hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-4 space-y-3">
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-          {CATEGORIES.map((cat) => {
-            const meta = CATEGORY_META[cat];
-            return (
-              <FilterChip
-                key={cat}
-                label={cat}
-                icon={meta.icon}
-                active={categories.has(cat)}
-                onClick={() => toggleCategory(cat)}
-                activeStyle={{ backgroundColor: meta.bg, color: meta.fg }}
-              />
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <FilterChip label="Any day" active={dateFilter === 'any'} onClick={() => setDateFilter('any')} />
-          <FilterChip label="Today" active={dateFilter === 'today'} onClick={() => setDateFilter('today')} />
-          <FilterChip label="This week" active={dateFilter === 'week'} onClick={() => setDateFilter('week')} />
-          <span className="mx-1 self-center text-border" aria-hidden="true">|</span>
-          {WHO_OPTIONS.map((opt) => (
-            <FilterChip key={opt.id} label={opt.label} active={who === opt.id} onClick={() => setWho(opt.id)} />
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-col gap-4">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 px-4 py-8 sm:px-6 md:grid-cols-2 lg:grid-cols-3 lg:px-8">
         {loading ? (
           <>
             <SkeletonCard />
@@ -126,9 +137,9 @@ export function DiscoverFeed({ onCreate, focusActivityId = null }) {
         ) : visible.length === 0 ? (
           <EmptyState
             title="No activities match your filters"
-            description="Try clearing a filter or two — or be the one who starts something. Someone out there is hoping you will."
-            actionLabel="Create an activity"
-            onAction={onCreate}
+            description="Try adjusting your category, date, or audience filters."
+            actionLabel={filtersActive ? 'Clear all filters' : 'Create an activity'}
+            onAction={filtersActive ? clearFilters : onCreate}
           />
         ) : (
           visible.map((a) => (

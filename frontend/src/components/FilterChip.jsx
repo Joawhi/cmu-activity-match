@@ -1,17 +1,16 @@
 import { cn } from '../lib/utils';
 
-export function FilterChip({ label, active, onClick, icon: Icon, activeStyle }) {
+export function FilterChip({ label, active, onClick, icon: Icon }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      style={active && activeStyle ? activeStyle : undefined}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+        'inline-flex shrink-0 snap-start items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
         active
-          ? 'border-transparent bg-foreground text-background'
-          : 'border-border bg-background text-foreground hover:bg-secondary'
+          ? 'border-foreground bg-foreground text-background'
+          : 'border-border bg-card text-foreground hover:border-foreground'
       )}
     >
       {Icon ? <Icon className="size-3.5" strokeWidth={2} /> : null}

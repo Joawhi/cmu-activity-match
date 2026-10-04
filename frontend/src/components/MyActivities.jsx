@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { useApp } from '../context/AppProvider';
 import { ActivityCard } from './ActivityCard';
 import { EmptyState } from './EmptyState';
@@ -32,14 +31,14 @@ export function MyActivities({ onCreate, onEdit, focusActivityId = null, focusSe
   }, [activities, currentUser]);
 
   const navigation = [
-    { id: 'created', label: 'Created by me', count: sections.created.length },
+    { id: 'created', label: 'Hosting', count: sections.created.length },
     { id: 'joined', label: 'Joined', count: sections.joined.length },
     { id: 'pending', label: 'Pending', count: sections.pending.length },
   ];
 
   const sectionDetails = {
     created: {
-      title: 'Created by me',
+      title: 'Hosting',
       description: 'Manage your activities and review join requests.',
       emptyTitle: 'You are not hosting anything yet',
       emptyDescription:
@@ -64,7 +63,7 @@ export function MyActivities({ onCreate, onEdit, focusActivityId = null, focusSe
   };
 
   const renderCards = (items, variant, showChat) => (
-    <div className="flex flex-col gap-4">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {items.map((activity) => (
         <ActivityCard
           key={activity.id}
@@ -79,91 +78,43 @@ export function MyActivities({ onCreate, onEdit, focusActivityId = null, focusSe
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:py-8">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-balance sm:text-4xl app-heading">
-            My activities
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Manage what you are hosting and review who wants to join.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onCreate}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none active:translate-y-px"
-        >
-          <Plus className="size-4" strokeWidth={2.5} />
-          <span className="hidden sm:inline">New activity</span>
-        </button>
-      </header>
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-bold text-foreground sm:text-3xl">My Activities</h1>
 
-      <div className="mb-6 overflow-x-auto border-b border-border pb-2 lg:hidden">
-        <nav aria-label="My activities sections" className="flex min-w-max gap-2">
-          {navigation.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveSection(item.id)}
-              aria-pressed={activeSection === item.id}
-              className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${activeSection === item.id
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
-            >
-              {item.label} ({item.count})
-            </button>
-          ))}
-        </nav>
+      <div className="mb-6 flex w-full gap-1 overflow-x-auto rounded-xl bg-secondary p-1.5 sm:w-max">
+        {navigation.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setActiveSection(item.id)}
+            aria-pressed={activeSection === item.id}
+            className={`rounded-lg px-6 py-2 text-sm font-semibold whitespace-nowrap transition-all ${activeSection === item.id
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-secondary/80'
+              }`}
+          >
+            {item.label}
+            <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">{item.count}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start">
-        <aside className="sticky top-24 hidden lg:block">
-          <nav aria-label="My activities sections" className="border-l border-border">
-            {navigation.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveSection(item.id)}
-                aria-pressed={activeSection === item.id}
-                className={`-ml-px flex w-full items-center justify-between border-l-2 px-4 py-2.5 text-left text-sm font-medium transition-colors ${activeSection === item.id
-                  ? 'border-primary bg-secondary/60 text-foreground'
-                  : 'border-transparent text-muted-foreground hover:border-primary hover:bg-secondary/60 hover:text-foreground'
-                  }`}
-              >
-                <span>{item.label}</span>
-                <span className="text-xs tabular-nums">{item.count}</span>
-              </button>
-            ))}
-          </nav>
-        </aside>
-
-        <div className="min-w-0 space-y-10">
-          <section aria-labelledby={`${activeSection}-heading`}>
-            <div className="mb-4">
-              <h2 id={`${activeSection}-heading`} className="font-serif text-2xl font-semibold tracking-tight">
-                {sectionDetails[activeSection].title}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">{sectionDetails[activeSection].description}</p>
-            </div>
-            {sections[activeSection].length === 0 ? (
-              <EmptyState
-                title={sectionDetails[activeSection].emptyTitle}
-                description={sectionDetails[activeSection].emptyDescription}
-                actionLabel={sectionDetails[activeSection].emptyAction}
-                onAction={sectionDetails[activeSection].emptyAction ? onCreate : undefined}
-              />
-            ) : (
-              renderCards(
-                sections[activeSection],
-                sectionDetails[activeSection].variant,
-                activeSection === 'created' || activeSection === 'joined'
-              )
-            )}
-          </section>
-        </div>
-      </div>
+      <section aria-label={sectionDetails[activeSection].title}>
+        {sections[activeSection].length === 0 ? (
+          <EmptyState
+            title={sectionDetails[activeSection].emptyTitle}
+            description={sectionDetails[activeSection].emptyDescription}
+            actionLabel={sectionDetails[activeSection].emptyAction}
+            onAction={sectionDetails[activeSection].emptyAction ? onCreate : undefined}
+          />
+        ) : (
+          renderCards(
+            sections[activeSection],
+            sectionDetails[activeSection].variant,
+            activeSection === 'created' || activeSection === 'joined'
+          )
+        )}
+      </section>
     </div>
   );
 }

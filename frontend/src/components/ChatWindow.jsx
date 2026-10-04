@@ -14,18 +14,35 @@ export function ChatWindow({ activityId }) {
     const [loadingEarlier, setLoadingEarlier] = useState(false);
     const [hasEarlier, setHasEarlier] = useState(false);
     const [sending, setSending] = useState(false);
+    const [loadedActivityId, setLoadedActivityId] = useState(activityId);
     const messagesContainerRef = useRef(null);
     const lastMessageIdRef = useRef(0);
     const oldestMessageIdRef = useRef(null);
+    const readyRef = useRef(false);
     const scrollToBottomRef = useRef(false);
     const scrollAdjustmentRef = useRef(null);
+
+    if (loadedActivityId !== activityId) {
+        setLoadedActivityId(activityId);
+        setMessages([]);
+        setLoading(true);
+        setHasEarlier(false);
+        setError('');
+        lastMessageIdRef.current = 0;
+        oldestMessageIdRef.current = null;
+        readyRef.current = false;
+    }
 
     useEffect(() => {
         let cancelled = false;
         let polling = false;
+        readyRef.current = false;
+        lastMessageIdRef.current = 0;
+        oldestMessageIdRef.current = null;
 
         const loadMessages = async (initial = false) => {
             if (polling) return;
+            if (!initial && !readyRef.current) return;
             polling = true;
             try {
                 const result = await api.getChatMessages(
@@ -35,14 +52,21 @@ export function ChatWindow({ activityId }) {
                 );
                 const rows = result.messages;
                 if (cancelled) return;
-                if (rows.length > 0) {
-                    if (initial) {
-                        oldestMessageIdRef.current = rows[0].id;
-                        setHasEarlier(result.hasEarlier);
-                    }
-                    lastMessageIdRef.current = rows[rows.length - 1].id;
-                    setMessages((previous) => initial ? rows : [...previous, ...rows]);
+                if (initial) {
+                    oldestMessageIdRef.current = rows[0]?.id ?? null;
+                    lastMessageIdRef.current = rows.at(-1)?.id ?? 0;
+                    setHasEarlier(Boolean(result.hasEarlier));
+                    setMessages(rows);
+                    readyRef.current = true;
                     scrollToBottomRef.current = true;
+                } else if (rows.length > 0) {
+                    lastMessageIdRef.current = rows.at(-1).id;
+                    setMessages((previous) => {
+                        const seen = new Set(previous.map((message) => message.id));
+                        const next = rows.filter((message) => !seen.has(message.id));
+                        return next.length === 0 ? previous : [...previous, ...next];
+                    });
+                    scrollToBottomRef.current = rows.length > 0;
                 }
                 setError('');
             } catch (requestError) {
@@ -120,8 +144,11 @@ export function ChatWindow({ activityId }) {
         setError('');
         try {
             const message = await api.sendChatMessage(activityId, currentUser.id, trimmed);
-            setMessages((previous) => [...previous, message]);
+            setMessages((previous) => (
+                previous.some((item) => item.id === message.id) ? previous : [...previous, message]
+            ));
             lastMessageIdRef.current = message.id;
+            scrollToBottomRef.current = true;
             setContent('');
         } catch (requestError) {
             setError(requestError.message);
@@ -238,7 +265,7 @@ export function ChatModal({ activityId, onClose }) {
                         <X className="size-5" strokeWidth={2} />
                     </button>
                 </div>
-                <ChatWindow activityId={activityId} />
+                <ChatWindow key={activityId} activityId={activityId} />
             </div>
         </div>
     );

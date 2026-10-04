@@ -21,7 +21,10 @@
   --color-ring: var(--ring);
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
+  --font-serif: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-cmu-dark: #9a0d24;
+  --color-cmu-soft: #fdf2f4;
 
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
@@ -31,21 +34,21 @@
 :root {
   color-scheme: light;
 
-  --background: #faf7f2;
-  --foreground: #1a1816;
+  --background: #f9fafb;
+  --foreground: #111827;
 
   --card: #ffffff;
-  --card-foreground: #1a1816;
+  --card-foreground: #111827;
 
   /* CMU cardinal red */
   --primary: #c41230;
-  --primary-foreground: #fffaf7;
+  --primary-foreground: #ffffff;
 
-  --secondary: #f2ece2;
-  --secondary-foreground: #1a1816;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #111827;
 
-  --muted: #f2ece2;
-  --muted-foreground: #756e64;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
 
   /* warm amber / gold */
   --accent: #d98e2c;
@@ -59,7 +62,7 @@
   --destructive: #a15c58;
   --destructive-foreground: #fbf3f2;
 
-  --border: #e8e2d8;
+  --border: #e5e7eb;
   --ring: #c41230;
 
   --radius: 0.875rem;
@@ -88,11 +91,11 @@
    the normal Tailwind color utility on these elements. */
 
 .app-heading {
-  font-family: 'Fraunces', serif;
-  font-style: italic;
-  font-weight: 600;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 700;
   letter-spacing: -0.02em;
-  color: #1a1816 !important;
+  color: #111827 !important;
 }
 
 /* Chat chrome. These are h2s, and frontend/src/index.css sets an unlayered
@@ -113,16 +116,16 @@
 
 .chat-activity-title {
   margin: 0;
-  font-family: 'Fraunces', ui-serif, Georgia, serif;
-  font-size: 1.35rem;
-  font-weight: 600;
-  font-style: italic;
-  letter-spacing: -0.02em;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: -0.01em;
   line-height: 1.25;
   text-align: left;
-  color: #8f1d32 !important;
+  color: #111827 !important;
 }
 
 .chat-list-title {
-  color: #8f1d32 !important;
+  color: #111827 !important;
 }

@@ -43,11 +43,8 @@ export function Chats() {
   const selectedRoom = rooms.find((room) => room.activity_id === selectedActivityId);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 sm:py-8">
-      <header className="mb-6">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl app-heading">Chats</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">Keep up with the activities you joined.</p>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-bold text-foreground sm:text-3xl">Messages</h1>
 
       <div className="grid min-h-[min(680px,calc(100dvh-12rem))] overflow-hidden rounded-2xl border border-border bg-card lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
         <aside className="border-b border-border lg:border-b-0 lg:border-r" aria-label="Chat conversations">
@@ -72,14 +69,14 @@ export function Chats() {
                     : 'hover:bg-secondary/40'
                     }`}
                 >
-                  <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <MessageCircle className="size-4" strokeWidth={2} />
+                  <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary text-lg font-bold text-primary">
+                    {(room.activity_title || '?').slice(0, 1).toUpperCase()}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="chat-list-title truncate text-sm font-semibold">{room.activity_title}</span>
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="chat-list-title truncate text-sm font-bold">{room.activity_title}</span>
                       {room.last_message_created_at && (
-                        <time className="shrink-0 text-[11px] text-muted-foreground">
+                        <time className="shrink-0 text-xs font-semibold text-primary">
                           {formatRoomTime(room.last_message_created_at)}
                         </time>
                       )}
@@ -98,7 +95,7 @@ export function Chats() {
 
         <section className="flex min-h-[32rem] min-w-0 flex-col" aria-label="Selected chat">
           {selectedRoom ? (
-            <ChatWindow activityId={selectedRoom.activity_id} />
+            <ChatWindow key={selectedRoom.activity_id} activityId={selectedRoom.activity_id} />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground">
               <MessageCircle className="mb-3 size-8" strokeWidth={1.5} />
