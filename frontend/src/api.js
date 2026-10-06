@@ -34,6 +34,12 @@ export const api = {
   updateProfile: (id, fields) =>
     request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(fields) }),
 
+  changePassword: (id, currentPassword, newPassword) =>
+    request(`/users/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
   uploadPhoto: async (id, file) => {
     const formData = new FormData();
     formData.append('photo', file);

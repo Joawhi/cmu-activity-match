@@ -5,6 +5,7 @@ import { Avatar } from './Avatar';
 import { photoUrlFrom } from '../lib/helpers';
 import { SCHOOL_YEARS, LANGUAGES, LANGUAGE_FLAGS } from '../constants';
 import { api } from '../api';
+import { validatePassword } from '../lib/account';
 import { cn } from '../lib/utils';
 
 export function ProfileModal() {
@@ -137,6 +138,19 @@ export function ProfileModal() {
 const editInputClass =
   'w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 
+function passwordChangeErrors(currentPassword, newPassword, confirmPassword) {
+  const errors = {};
+  if (!currentPassword) errors.currentPassword = 'Current password is required';
+  const nextError = validatePassword(newPassword);
+  if (nextError) errors.newPassword = nextError;
+  else if (newPassword === currentPassword) {
+    errors.newPassword = 'New password must be different from the current password';
+  }
+  if (!confirmPassword) errors.confirmPassword = 'Confirm your new password';
+  else if (confirmPassword !== newPassword) errors.confirmPassword = 'Passwords do not match';
+  return errors;
+}
+
 function EditProfileForm({ profile, onSave, onCancel }) {
   const [displayName, setDisplayName] = useState(profile.display_name || '');
   const [bio, setBio] = useState(profile.bio || '');
@@ -145,6 +159,11 @@ function EditProfileForm({ profile, onSave, onCancel }) {
   const [languages, setLanguages] = useState(profile.languages ? profile.languages.split(',').filter(Boolean) : []);
   const [photoFile, setPhotoFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const toggleLang = (lang) =>
@@ -160,16 +179,28 @@ function EditProfileForm({ profile, onSave, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const changingPassword = currentPassword || newPassword || confirmPassword;
+    const errors = changingPassword ? passwordChangeErrors(currentPassword, newPassword, confirmPassword) : {};
+    setPasswordErrors(errors);
+    setFormError('');
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
-    await onSave({
-      display_name: displayName.trim(),
-      bio: bio.trim(),
-      school_year: schoolYear,
-      major: major.trim(),
-      languages: languages.join(','),
-      photoFile,
-    });
-    setSaving(false);
+    try {
+      await onSave({
+        display_name: displayName.trim(),
+        bio: bio.trim(),
+        school_year: schoolYear,
+        major: major.trim(),
+        languages: languages.join(','),
+        photoFile,
+        ...(changingPassword ? { currentPassword, newPassword } : {}),
+      });
+    } catch (err) {
+      setFormError(err.message || 'Could not save profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -234,6 +265,56 @@ function EditProfileForm({ profile, onSave, onCancel }) {
           })}
         </div>
       </div>
+
+      <div className="flex flex-col gap-4 border-t border-border pt-5">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Change password</p>
+          <p className="mt-1 text-xs text-muted-foreground">Leave these blank to keep your current password.</p>
+        </div>
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-semibold text-foreground">Current password</span>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+            className={editInputClass}
+          />
+          {passwordErrors.currentPassword && (
+            <span className="text-xs text-destructive">{passwordErrors.currentPassword}</span>
+          )}
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-semibold text-foreground">New password</span>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            className={editInputClass}
+          />
+          {passwordErrors.newPassword ? (
+            <span className="text-xs text-destructive">{passwordErrors.newPassword}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">At least 8 characters, with a letter and a number.</span>
+          )}
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-sm font-semibold text-foreground">Confirm new password</span>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            className={editInputClass}
+          />
+          {passwordErrors.confirmPassword && (
+            <span className="text-xs text-destructive">{passwordErrors.confirmPassword}</span>
+          )}
+        </label>
+      </div>
+
+      {formError && <p className="text-sm text-destructive">{formError}</p>}
 
       <div className="flex items-center gap-3 pt-1">
         <button

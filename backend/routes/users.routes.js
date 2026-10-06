@@ -207,6 +207,44 @@ router.post('/password/reset', loginLimiter, async (req, res) => {
   }
 });
 
+router.put('/:id/password', async (req, res) => {
+  try {
+    const currentPassword = req.body.current_password;
+    if (typeof currentPassword !== 'string' || currentPassword.length === 0) {
+      return res.status(400).json({ error: 'Current password is required' });
+    }
+
+    const nextPassword = parseAccountPassword(req.body.new_password);
+    if (!nextPassword.ok) return res.status(400).json({ error: nextPassword.error });
+
+    if (currentPassword === nextPassword.value) {
+      return res.status(400).json({ error: 'New password must be different from the current password' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id, password_hash FROM users WHERE id = $1',
+      [req.params.id]
+    );
+    const user = existing.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.password_hash) {
+      return res.status(400).json({ error: 'This account does not have a password yet' });
+    }
+
+    const matches = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!matches) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    const passwordHash = await bcrypt.hash(nextPassword.value, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    handleServerError(err, res);
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);

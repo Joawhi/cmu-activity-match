@@ -33,7 +33,10 @@ export function UserProvider({ children }) {
     setCurrentUser(null);
   };
 
-  const updateProfile = async ({ photoFile, ...fields }) => {
+  const updateProfile = async ({ photoFile, currentPassword, newPassword, ...fields }) => {
+    if (newPassword) {
+      await api.changePassword(currentUser.id, currentPassword, newPassword);
+    }
     await api.updateProfile(currentUser.id, fields);
     if (photoFile) {
       await api.uploadPhoto(currentUser.id, photoFile);
