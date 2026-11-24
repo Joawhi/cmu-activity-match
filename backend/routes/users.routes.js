@@ -14,7 +14,7 @@ const {
   parseLanguages,
   publicUser,
 } = require('../utils/validators');
-const { loginLimiter } = require('../utils/security');
+const { loginIpLimiter, loginAccountLimiter } = require('../utils/security');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads'),
@@ -24,7 +24,7 @@ const upload = multer({ storage });
 
 const router = express.Router();
 
-router.post('/register', loginLimiter, async (req, res) => {
+router.post('/register', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   try {
     const name = parseAccountName(req.body.name);
     if (!name.ok) return res.status(400).json({ error: name.error });
@@ -122,7 +122,7 @@ router.post('/register', loginLimiter, async (req, res) => {
   }
 });
 
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   try {
     const email = parseAccountEmail(req.body.email);
     if (!email.ok) return res.status(400).json({ error: email.error });
@@ -153,7 +153,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 });
 
-router.post('/password/question', loginLimiter, async (req, res) => {
+router.post('/password/question', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   try {
     const email = parseAccountEmail(req.body.email);
     if (!email.ok) return res.status(400).json({ error: email.error });
@@ -173,7 +173,7 @@ router.post('/password/question', loginLimiter, async (req, res) => {
   }
 });
 
-router.post('/password/reset', loginLimiter, async (req, res) => {
+router.post('/password/reset', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   try {
     const email = parseAccountEmail(req.body.email);
     if (!email.ok) return res.status(400).json({ error: email.error });

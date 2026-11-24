@@ -70,7 +70,7 @@ export function ActivitiesProvider({ children }) {
     const refresh = () => {
       refreshActivities().catch(() => {});
     };
-    const intervalId = window.setInterval(refresh, 10000);
+    const intervalId = window.setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
     return () => {
       window.clearInterval(intervalId);

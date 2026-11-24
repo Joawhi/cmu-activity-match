@@ -27,7 +27,7 @@ export function NotificationsProvider({ children }) {
       return;
     }
     refreshNotifications();
-    const intervalId = window.setInterval(refreshNotifications, 20000);
+    const intervalId = window.setInterval(refreshNotifications, 60000);
     return () => window.clearInterval(intervalId);
   }, [currentUser, refreshNotifications]);
 

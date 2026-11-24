@@ -14,6 +14,9 @@ const notificationsRoutes = require('./routes/notifications.routes');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Render sits behind one proxy. Trust that hop so each student has their own IP.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: corsOriginCheck }));
 app.use(express.json());
 app.use('/api/', apiLimiter);
